@@ -24,6 +24,8 @@ RooseHotel.Data (SQLite repository)
 
 The app stores its local database at `%LOCALAPPDATA%\RooseHotel\roosehotel.db`.
 
+The UI uses white backgrounds, fine gold borders, and coffee-brown active states; see [docs/visual-style.md](docs/visual-style.md).
+
 ## Build and run
 
 Requirements: Windows, .NET 9 SDK, and access to NuGet for the `Microsoft.Data.Sqlite` package.

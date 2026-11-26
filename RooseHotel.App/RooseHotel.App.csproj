@@ -1,6 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <Content Include="..\assets\roose-brand-mark.png">
+      <Link>assets\roose-brand-mark.png</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\RooseHotel.Core\RooseHotel.Core.csproj" />
     <ProjectReference Include="..\RooseHotel.Data\RooseHotel.Data.csproj" />
   </ItemGroup>
