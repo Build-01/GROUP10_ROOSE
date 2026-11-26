@@ -22,18 +22,37 @@
 | UT-05 | FR-07 | Existing 10–12 Nov; requested 11–13 Nov. | Overlap detected. | Pending execution |
 | UT-06 | FR-09 | Rate ₦120,000; three nights. | Charge is ₦360,000. | Pending execution |
 | IT-01 | FR-11 | Initialize an empty database. | Schema and expected 30 seed rooms are created once. | Pending execution |
-| IT-02 | FR-05 | Search dates conflicting with a confirmed reservation. | The reserved room is omitted. | Pending execution |
-| IT-03 | FR-06/07 | Insert overlapping reservation for the same room. | Operation is rejected and no duplicate row is saved. | Pending execution |
-| IT-04 | FR-08 | Cancel a reservation and search its dates. | The cancelled reservation no longer blocks the room. | Pending execution |
+| IT-02 | FR-05 | Search dates conflicting with a confirmed reservation. | The reserved room is omitted. | Passed (26 Nov 2026) |
+| IT-03 | FR-06/07 | Insert overlapping reservation for the same room. | Operation is rejected and no duplicate row is saved. | Passed (26 Nov 2026) |
+| IT-04 | FR-08 | Cancel a reservation and search its dates. | The cancelled reservation no longer blocks the room. | Passed (26 Nov 2026) |
 | IT-05 | FR-11 | Save records, close connection, reopen database. | Saved data is still present. | Pending execution |
 | IT-06 | FR-03 | Add a room with valid details. | Room is stored and appears in the room list. | Pending execution |
 | IT-07 | FR-03 | Edit a room's category, rate, capacity, and status. | Updated values persist and appear in the room list. | Pending execution |
 | IT-08 | FR-03 | Add or rename a room to a duplicate number. | Database rejects the duplicate and UI explains the conflict. | Pending execution |
 | IT-09 | FR-03/05 | Filter the room list by number, category, and operational status. | Only rooms matching all selected filters are shown. | Pending execution |
+| IT-10 | FR-04 | Register a guest with name, phone, and email. | Guest record is saved and searchable by name, phone, and email. | Passed (26 Nov 2026) |
+| IT-11 | FR-04 | Update a guest's contact details. | Updated name, phone, and email persist. | Passed (26 Nov 2026) |
+| IT-12 | FR-06/07/08 | Create overlapping and adjacent stays, update a confirmed reservation, cancel it, then search the released dates. | Overlap is rejected, adjacent stay is allowed, update persists, and cancellation frees availability. | Passed (26 Nov 2026) |
 | ST-01 | FR-01/02 | Sign in and open dashboard. | Authorized staff sees current summary. | Pending execution |
 | ST-02 | FR-04–09 | Register a guest and complete a valid booking. | Reservation and charge summary are correct. | Pending execution |
 | ST-03 | FR-10 | Check in then check out an eligible reservation. | State changes are recorded in order. | Pending execution |
 
 ## Execution log
 
-The core, data, app, and test projects compile. The VSTest process could not connect to its testhost after a 120-second timeout, so no automated assertions ran and all cases remain pending. Rerun `dotnet test RooseHotel.sln` in the target Windows development environment and record the build/runtime version, actual result, pass/fail, defect ID, and retest result. A test is not marked passed until the observed output is recorded.
+### 2026-11-26 — Phase 2 verification
+
+Command: `dotnet test RooseHotel.Tests/RooseHotel.Tests.csproj --no-restore --verbosity minimal --logger "console;verbosity=normal"`.
+
+Environment: .NET SDK 9.0.305, .NET runtime 9.0.9, VSTest 17.14.1, Windows x64. Result: **6 passed, 0 failed**. Covered room seeding (30 rooms, idempotent initialization), room create/update persistence, duplicate room rejection, reservation date/charge rules, availability overlap and adjacent dates, and password hashing. Defect fixed during verification: SQLite connection pooling kept temporary test databases open during teardown; the test helper now clears SQLite pools before deleting test folders.
+
+System walkthroughs and screenshots remain planned acceptance/release evidence.
+
+### 2026-11-26 — Phase 4 verification
+
+Command: `dotnet test RooseHotel.Tests/RooseHotel.Tests.csproj --no-restore --verbosity minimal --logger "console;verbosity=minimal"` — **8 passed, 0 failed, 0 skipped**. The reservation lifecycle check verifies overlap rejection, adjacent dates, update persistence, cancellation status, and released-room availability. App build: `dotnet build RooseHotel.App/RooseHotel.App.csproj --no-restore --verbosity minimal -p:BaseOutputPath=bin/phase4/ -p:UseSharedCompilation=false` — **0 warnings, 0 errors**. Manual reservation UI walkthrough/screenshot remains for release evidence.
+
+### 2026-11-26 — Phase 3 verification
+
+Command: `dotnet test RooseHotel.Tests/RooseHotel.Tests.csproj --no-restore --verbosity minimal --logger "console;verbosity=minimal"`.
+
+Result: **7 passed, 0 failed, 0 skipped** (including guest create/update and search by name and phone). Full application build: `dotnet build RooseHotel.App/RooseHotel.App.csproj --no-restore --verbosity minimal -p:BaseOutputPath=bin/phase3/ -p:UseSharedCompilation=false` — **0 warnings, 0 errors**. Separate output was used because the already-running app holds its default build files open. Guest screen manual walkthrough and screenshot remain for release evidence.

@@ -87,6 +87,25 @@ public sealed class HotelTests
     }
 
     [Fact]
+    public async Task Guest_CreateUpdateAndSearch_PersistsContactDetails()
+    {
+        var (repository, folder) = CreateRepository();
+        try
+        {
+            await repository.InitializeAsync();
+            var id = await repository.CreateGuestAsync(new Guest(0, "Ada Guest", "08000000000", "ada@example.test"));
+            await repository.UpdateGuestAsync(new Guest(id, "Ada Updated", "08000000001", "updated@example.test"));
+
+            var byName = await repository.SearchGuestsAsync("Updated");
+            var byPhone = await repository.SearchGuestsAsync("8000000001");
+            Assert.Single(byName);
+            Assert.Equal("updated@example.test", byName[0].Email);
+            Assert.Contains(byPhone, guest => guest.Id == id);
+        }
+        finally { DeleteTestFolder(folder); }
+    }
+
+    [Fact]
     public async Task AvailabilitySearch_RejectsOverlapsAndAllowsAdjacentStay()
     {
         var (repository, folder) = CreateRepository();
@@ -107,6 +126,36 @@ public sealed class HotelTests
         finally { DeleteTestFolder(folder); }
     }
 
+    [Fact]
+    public async Task Reservation_CreateUpdateCancel_EnforcesConflictsAndFreesRoom()
+    {
+        var (repository, folder) = CreateRepository();
+        try
+        {
+            await repository.InitializeAsync();
+            var rooms = await repository.GetRoomsAsync();
+            var guestId = await repository.CreateGuestAsync(new Guest(0, "Reservation Guest", "08000000000", "book@example.test"));
+            var firstRequest = new ReservationRequest(guestId, rooms[0].Id, new DateOnly(2026, 12, 10), new DateOnly(2026, 12, 12));
+            var id = await repository.CreateReservationAsync(firstRequest);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => repository.CreateReservationAsync(
+                new ReservationRequest(guestId, rooms[0].Id, new DateOnly(2026, 12, 11), new DateOnly(2026, 12, 13))));
+            var adjacentId = await repository.CreateReservationAsync(
+                new ReservationRequest(guestId, rooms[0].Id, new DateOnly(2026, 12, 12), new DateOnly(2026, 12, 14)));
+            await repository.UpdateReservationAsync(new ReservationUpdateRequest(id, guestId, rooms[1].Id,
+                new DateOnly(2026, 12, 10), new DateOnly(2026, 12, 12)));
+            await repository.CancelReservationAsync(id);
+
+            var reservations = await repository.GetReservationsAsync("Reservation Guest");
+            Assert.Equal(ReservationStatus.Cancelled, reservations.Single(r => r.Id == id).Status);
+            Assert.Equal(rooms[1].Number, reservations.Single(r => r.Id == id).RoomNumber);
+            Assert.Equal(ReservationStatus.Confirmed, reservations.Single(r => r.Id == adjacentId).Status);
+            var available = await repository.FindAvailableRoomsAsync(new DateOnly(2026, 12, 10), new DateOnly(2026, 12, 12));
+            Assert.Contains(available, room => room.Id == rooms[0].Id);
+        }
+        finally { DeleteTestFolder(folder); }
+    }
+
     private static (SqliteHotelRepository Repository, string Folder) CreateRepository()
     {
         var folder = Path.Combine(Path.GetTempPath(), $"RooseHotel.Tests.{Guid.NewGuid():N}");
@@ -116,6 +165,9 @@ public sealed class HotelTests
 
     private static void DeleteTestFolder(string folder)
     {
+        // Microsoft.Data.Sqlite pools connections by connection string. Clear the
+        // pool before deleting the temporary database on Windows.
+        SqliteConnection.ClearAllPools();
         if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
     }
 }
