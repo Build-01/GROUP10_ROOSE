@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using RooseHotel.Core;
+using System.Globalization;
 
 namespace RooseHotel.Data;
 
@@ -51,12 +52,17 @@ public sealed class SqliteHotelRepository(string databasePath) : IHotelRepositor
                 CheckIn TEXT NOT NULL,
                 CheckOut TEXT NOT NULL,
                 Status TEXT NOT NULL DEFAULT 'Confirmed',
+                ActualCheckIn TEXT NULL,
+                ActualCheckOut TEXT NULL,
                 CHECK (CheckOut > CheckIn)
             );
             CREATE INDEX IF NOT EXISTS IX_Reservations_Room_Dates
                 ON Reservations(RoomId, CheckIn, CheckOut, Status);
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
+
+        await EnsureReservationColumnAsync(connection, "ActualCheckIn", cancellationToken);
+        await EnsureReservationColumnAsync(connection, "ActualCheckOut", cancellationToken);
 
         var countCommand = connection.CreateCommand();
         countCommand.CommandText = "SELECT COUNT(*) FROM Rooms;";
@@ -105,7 +111,11 @@ public sealed class SqliteHotelRepository(string databasePath) : IHotelRepositor
         await using var connection = OpenConnection();
         await connection.OpenAsync(cancellationToken);
         var command = connection.CreateCommand();
-        command.CommandText = "SELECT Id, Number, Category, NightlyRate, Capacity, OperationalStatus FROM Rooms ORDER BY Number;";
+        command.CommandText = """
+            SELECT r.Id, r.Number, r.Category, r.NightlyRate, r.Capacity, r.OperationalStatus,
+                EXISTS(SELECT 1 FROM Reservations b WHERE b.RoomId=r.Id AND b.Status='CheckedIn')
+            FROM Rooms r ORDER BY r.Number;
+            """;
         var rooms = new List<Room>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken)) rooms.Add(ReadRoom(reader));
@@ -273,7 +283,7 @@ public sealed class SqliteHotelRepository(string databasePath) : IHotelRepositor
         await connection.OpenAsync(cancellationToken);
         var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT b.Id, b.GuestId, g.FullName, r.Number, r.NightlyRate, b.CheckIn, b.CheckOut, b.Status
+            SELECT b.Id, b.GuestId, g.FullName, r.Number, r.NightlyRate, b.CheckIn, b.CheckOut, b.Status, b.ActualCheckIn, b.ActualCheckOut
             FROM Reservations b JOIN Guests g ON g.Id=b.GuestId JOIN Rooms r ON r.Id=b.RoomId
             WHERE CAST(b.Id AS TEXT) LIKE $query OR g.FullName LIKE $query OR r.Number LIKE $query OR b.Status LIKE $query
             ORDER BY b.Id DESC;
@@ -283,7 +293,9 @@ public sealed class SqliteHotelRepository(string databasePath) : IHotelRepositor
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
             items.Add(new ReservationSummary(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3), reader.GetDecimal(4),
-                DateOnly.Parse(reader.GetString(5)), DateOnly.Parse(reader.GetString(6)), Enum.Parse<ReservationStatus>(reader.GetString(7))));
+                DateOnly.Parse(reader.GetString(5)), DateOnly.Parse(reader.GetString(6)), Enum.Parse<ReservationStatus>(reader.GetString(7)),
+                reader.IsDBNull(8) ? null : DateTimeOffset.Parse(reader.GetString(8), CultureInfo.InvariantCulture),
+                reader.IsDBNull(9) ? null : DateTimeOffset.Parse(reader.GetString(9), CultureInfo.InvariantCulture)));
         return items;
     }
 
@@ -336,9 +348,77 @@ public sealed class SqliteHotelRepository(string databasePath) : IHotelRepositor
             throw new InvalidOperationException("Only confirmed reservations can be cancelled.");
     }
 
+    public async Task CheckInReservationAsync(int reservationId, DateTimeOffset checkedInAt, CancellationToken cancellationToken = default)
+    {
+        var date = DateOnly.FromDateTime(checkedInAt.Date).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        await using var connection = OpenConnection();
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var eligible = connection.CreateCommand();
+        eligible.Transaction = (SqliteTransaction)transaction;
+        eligible.CommandText = """
+            SELECT COUNT(*) FROM Reservations b JOIN Rooms r ON r.Id=b.RoomId
+            WHERE b.Id=$id AND b.Status='Confirmed' AND r.OperationalStatus='Available'
+              AND b.CheckIn <= $date AND b.CheckOut > $date
+              AND NOT EXISTS (SELECT 1 FROM Reservations other WHERE other.RoomId=b.RoomId
+                AND other.Id<>b.Id AND other.Status='CheckedIn');
+            """;
+        eligible.Parameters.AddWithValue("$id", reservationId);
+        eligible.Parameters.AddWithValue("$date", date);
+        if (Convert.ToInt64(await eligible.ExecuteScalarAsync(cancellationToken)) != 1)
+            throw new InvalidOperationException("Check-in is allowed only for a confirmed reservation active on this date with an operational room.");
+        var update = connection.CreateCommand();
+        update.Transaction = (SqliteTransaction)transaction;
+        update.CommandText = "UPDATE Reservations SET Status='CheckedIn', ActualCheckIn=$actual WHERE Id=$id AND Status='Confirmed';";
+        update.Parameters.AddWithValue("$id", reservationId);
+        update.Parameters.AddWithValue("$actual", checkedInAt.ToString("O", CultureInfo.InvariantCulture));
+        await update.ExecuteNonQueryAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task CheckOutReservationAsync(int reservationId, DateTimeOffset checkedOutAt, CancellationToken cancellationToken = default)
+    {
+        await using var connection = OpenConnection();
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var check = connection.CreateCommand();
+        check.Transaction = (SqliteTransaction)transaction;
+        check.CommandText = "SELECT ActualCheckIn FROM Reservations WHERE Id=$id AND Status='CheckedIn';";
+        check.Parameters.AddWithValue("$id", reservationId);
+        var actualCheckIn = await check.ExecuteScalarAsync(cancellationToken) as string;
+        if (actualCheckIn is null)
+            throw new InvalidOperationException("Only checked-in reservations can be checked out.");
+        if (checkedOutAt < DateTimeOffset.Parse(actualCheckIn, CultureInfo.InvariantCulture))
+            throw new ArgumentException("Check-out time cannot be before the recorded check-in time.");
+        var update = connection.CreateCommand();
+        update.Transaction = (SqliteTransaction)transaction;
+        update.CommandText = "UPDATE Reservations SET Status='CheckedOut', ActualCheckOut=$actual WHERE Id=$id AND Status='CheckedIn';";
+        update.Parameters.AddWithValue("$id", reservationId);
+        update.Parameters.AddWithValue("$actual", checkedOutAt.ToString("O", CultureInfo.InvariantCulture));
+        await update.ExecuteNonQueryAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    private static async Task EnsureReservationColumnAsync(SqliteConnection connection, string column, CancellationToken cancellationToken)
+    {
+        var pragma = connection.CreateCommand();
+        pragma.CommandText = "PRAGMA table_info(Reservations);";
+        await using var reader = await pragma.ExecuteReaderAsync(cancellationToken);
+        var exists = false;
+        while (await reader.ReadAsync(cancellationToken))
+            if (reader.GetString(1).Equals(column, StringComparison.OrdinalIgnoreCase)) exists = true;
+        await reader.CloseAsync();
+        if (!exists)
+        {
+            var alter = connection.CreateCommand();
+            alter.CommandText = $"ALTER TABLE Reservations ADD COLUMN {column} TEXT NULL;";
+            await alter.ExecuteNonQueryAsync(cancellationToken);
+        }
+    }
+
     private static Room ReadRoom(SqliteDataReader reader) => new(reader.GetInt32(0), reader.GetString(1),
         Enum.Parse<RoomCategory>(reader.GetString(2)), reader.GetDecimal(3), reader.GetInt32(4),
-        Enum.Parse<RoomOperationalStatus>(reader.GetString(5)));
+        Enum.Parse<RoomOperationalStatus>(reader.GetString(5)), reader.FieldCount > 6 && reader.GetInt32(6) != 0);
 
     private static async Task SeedRoomsAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {

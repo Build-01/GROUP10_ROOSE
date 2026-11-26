@@ -34,9 +34,10 @@
 | IT-11 | FR-04 | Update a guest's contact details. | Updated name, phone, and email persist. | Passed (26 Nov 2026) |
 | IT-12 | FR-06/07/08 | Create overlapping and adjacent stays, update a confirmed reservation, cancel it, then search the released dates. | Overlap is rejected, adjacent stay is allowed, update persists, and cancellation frees availability. | Passed (26 Nov 2026) |
 | IT-13 | FR-09 | Load a reservation summary for a ₦120,000 room and three nights. | Summary reports the saved rate, three nights, and ₦360,000 charge. | Passed (26 Nov 2026) |
+| IT-14 | FR-10/11 | Open a database created by the previous schema, check in an active reservation, then check out. | Schema gains arrival/departure fields; room shows occupied and is unavailable after arrival, then is available after checkout. | Passed (26 Nov 2026) |
 | ST-01 | FR-01/02 | Sign in and open dashboard. | Authorized staff sees current summary. | Pending execution |
 | ST-02 | FR-04–09 | Register a guest and complete a valid booking. | Reservation and charge summary are correct. | Pending execution |
-| ST-03 | FR-10 | Check in then check out an eligible reservation. | State changes are recorded in order. | Pending execution |
+| ST-03 | FR-10 | Check in then check out an eligible reservation. | State changes are recorded in order. | Passed (26 Nov 2026) |
 
 ## Execution log
 
@@ -55,6 +56,10 @@ Command: `dotnet test RooseHotel.Tests/RooseHotel.Tests.csproj --no-restore --ve
 ### 2026-11-26 — Phase 5 verification
 
 Command: `dotnet test RooseHotel.Tests/RooseHotel.Tests.csproj --no-restore --verbosity minimal --logger "console;verbosity=minimal"` — **9 passed, 0 failed, 0 skipped**. Billing check: a three-night reservation in a ₦120,000 room returned a ₦360,000 accommodation total; test cases UT-06 and IT-13 passed. App build: `dotnet build RooseHotel.App/RooseHotel.App.csproj --no-restore --verbosity minimal -p:BaseOutputPath=bin/phase5/ -p:UseSharedCompilation=false` — **0 warnings, 0 errors**. Manual billing screen walkthrough/screenshot remains for release evidence.
+
+### 2026-11-26 — Phase 6 verification
+
+Command: `dotnet test RooseHotel.Tests/RooseHotel.Tests.csproj --no-restore --verbosity minimal --logger "console;verbosity=minimal"` — **10 passed, 0 failed, 0 skipped**. The check-in/out integration test verifies legacy schema migration, early check-in rejection, actual arrival/departure timestamps, Occupied display, unavailable search results during occupancy, and room release after checkout. App build: `dotnet build RooseHotel.App/RooseHotel.App.csproj --no-restore --verbosity minimal -p:BaseOutputPath=bin/phase6/ -p:UseSharedCompilation=false` — **0 warnings, 0 errors**. Manual front-desk walkthrough/screenshot remains for release evidence.
 
 ### 2026-11-26 — Phase 3 verification
 

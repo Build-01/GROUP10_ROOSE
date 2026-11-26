@@ -5,7 +5,10 @@ public enum RoomOperationalStatus { Available, Maintenance, OutOfService }
 public enum ReservationStatus { Confirmed, CheckedIn, CheckedOut, Cancelled }
 
 public sealed record Room(int Id, string Number, RoomCategory Category, decimal NightlyRate,
-    int Capacity, RoomOperationalStatus OperationalStatus);
+    int Capacity, RoomOperationalStatus OperationalStatus, bool IsOccupied = false)
+{
+    public string DisplayStatus => IsOccupied ? "Occupied" : OperationalStatus.ToString();
+}
 
 public sealed record Guest(int Id, string FullName, string Phone, string Email);
 public sealed record StaffAccount(int Id, string Username, string DisplayName, string PasswordSalt, string PasswordHash);
@@ -47,7 +50,8 @@ public sealed record Reservation(int Id, int GuestId, int RoomId, DateOnly Check
 public sealed record ReservationRequest(int GuestId, int RoomId, DateOnly CheckIn, DateOnly CheckOut);
 public sealed record ReservationUpdateRequest(int ReservationId, int GuestId, int RoomId, DateOnly CheckIn, DateOnly CheckOut);
 public sealed record ReservationSummary(int Id, int GuestId, string GuestName, string RoomNumber, decimal NightlyRate,
-    DateOnly CheckIn, DateOnly CheckOut, ReservationStatus Status)
+    DateOnly CheckIn, DateOnly CheckOut, ReservationStatus Status,
+    DateTimeOffset? ActualCheckIn = null, DateTimeOffset? ActualCheckOut = null)
 {
     public int Nights => CheckOut.DayNumber - CheckIn.DayNumber;
 }
@@ -92,4 +96,6 @@ public interface IHotelRepository
     Task<IReadOnlyList<ReservationSummary>> GetReservationsAsync(string query = "", CancellationToken cancellationToken = default);
     Task UpdateReservationAsync(ReservationUpdateRequest request, CancellationToken cancellationToken = default);
     Task CancelReservationAsync(int reservationId, CancellationToken cancellationToken = default);
+    Task CheckInReservationAsync(int reservationId, DateTimeOffset checkedInAt, CancellationToken cancellationToken = default);
+    Task CheckOutReservationAsync(int reservationId, DateTimeOffset checkedOutAt, CancellationToken cancellationToken = default);
 }

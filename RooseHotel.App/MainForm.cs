@@ -53,7 +53,7 @@ public sealed class MainForm : Form
         nav.Controls.Add(NavButton("Guests", ShowGuests));
         nav.Controls.Add(NavButton("Reservations", ShowReservations));
         nav.Controls.Add(NavButton("Billing", ShowBilling));
-        nav.Controls.Add(NavButton("Check-in / Check-out", () => ShowComingSoon("Check-in / Check-out")));
+        nav.Controls.Add(NavButton("Check-in / Check-out", ShowCheckInOut));
         sidebar.Controls.Add(nav);
         sidebar.Controls.Add(new Label { Text = "STAFF WORKSPACE", Dock = DockStyle.Bottom, Height = 35, ForeColor = Coffee, TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI", 8F, FontStyle.Bold) });
         return sidebar;
@@ -113,7 +113,7 @@ public sealed class MainForm : Form
             if (IsDisposed || _content.Controls.Count < 3) return;
             var stats = new FlowLayoutPanel { Left = 0, Top = 290, Width = 850, Height = 125, WrapContents = false, BackColor = Color.White };
             stats.Controls.Add(StatCard("Total Rooms", rooms.Count.ToString(CultureInfo.InvariantCulture)));
-            stats.Controls.Add(StatCard("Operational", rooms.Count(r => r.OperationalStatus == RoomOperationalStatus.Available).ToString(CultureInfo.InvariantCulture)));
+            stats.Controls.Add(StatCard("Operational", rooms.Count(r => r.OperationalStatus == RoomOperationalStatus.Available && !r.IsOccupied).ToString(CultureInfo.InvariantCulture)));
             stats.Controls.Add(StatCard("Categories", Enum.GetValues<RoomCategory>().Length.ToString(CultureInfo.InvariantCulture)));
             _content.Controls.Add(stats);
         }
@@ -129,7 +129,7 @@ public sealed class MainForm : Form
         category.DataSource = new[] { "All categories" }.Concat(Enum.GetValues<RoomCategory>().Select(FormatCategory)).ToList();
         var categoryFrame = GoldInput(category, 260, 112, 180, 34);
         var status = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Coffee };
-        status.DataSource = new[] { "All statuses" }.Concat(Enum.GetNames<RoomOperationalStatus>()).ToList();
+        status.DataSource = new[] { "All statuses", "Occupied" }.Concat(Enum.GetNames<RoomOperationalStatus>()).ToList();
         var statusFrame = GoldInput(status, 455, 112, 165, 34);
         var add = new Button { Text = "Add room", Left = 790, Top = 108, Width = 155, Height = 38 };
         StylePrimaryAction(add);
@@ -193,7 +193,7 @@ public sealed class MainForm : Form
                 return;
             }
             MessageBox.Show(this,
-                $"Room: {room.Number}\nCategory: {FormatCategory(room.Category)}\nNightly rate: {room.NightlyRate:N0} NGN\nCapacity: {room.Capacity}\nOperational status: {room.OperationalStatus}",
+                $"Room: {room.Number}\nCategory: {FormatCategory(room.Category)}\nNightly rate: {room.NightlyRate:N0} NGN\nCapacity: {room.Capacity}\nStatus: {room.DisplayStatus}",
                 $"Room {room.Number}", MessageBoxButtons.OK, MessageBoxIcon.Information);
         };
         _ = RefreshAsync();
@@ -209,10 +209,10 @@ public sealed class MainForm : Form
             foreach (var room in rooms.Where(r =>
                 (string.IsNullOrWhiteSpace(query) || r.Number.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase)) &&
                 (string.IsNullOrWhiteSpace(category) || category == "All categories" || FormatCategory(r.Category) == category) &&
-                (string.IsNullOrWhiteSpace(status) || status == "All statuses" || r.OperationalStatus.ToString() == status)))
+                (string.IsNullOrWhiteSpace(status) || status == "All statuses" || r.DisplayStatus == status)))
             {
                 var index = grid.Rows.Add(room.Number, FormatCategory(room.Category), room.Capacity,
-                    room.NightlyRate.ToString("₦#,##0", CultureInfo.GetCultureInfo("en-NG")), room.OperationalStatus);
+                    room.NightlyRate.ToString("₦#,##0", CultureInfo.GetCultureInfo("en-NG")), room.DisplayStatus);
                 grid.Rows[index].Tag = room;
             }
         }
@@ -451,6 +451,54 @@ public sealed class MainForm : Form
     }
 
     private sealed record BillingChoice(ReservationSummary Reservation, string Label);
+
+    private void ShowCheckInOut()
+    {
+        PreparePage("Check-in / Check-out", "Record arrivals and departures; checked-in rooms remain unavailable until checkout.");
+        var search = new TextBox { BorderStyle = BorderStyle.None, BackColor = Color.White, ForeColor = Coffee, PlaceholderText = "Search reservation, guest, room, or status..." };
+        var searchFrame = GoldInput(search, 0, 112, 390, 36);
+        var grid = new DataGridView { Left = 0, Top = 165, Width = 955, Height = 380, ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, MultiSelect = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, RowHeadersVisible = false, BackgroundColor = Color.White, BorderStyle = BorderStyle.None };
+        grid.Columns.Add("id", "Reservation"); grid.Columns.Add("guest", "Guest"); grid.Columns.Add("room", "Room"); grid.Columns.Add("checkin", "Booked Check-in"); grid.Columns.Add("checkout", "Booked Check-out"); grid.Columns.Add("status", "Status");
+        grid.EnableHeadersVisualStyles = false; grid.ColumnHeadersDefaultCellStyle.BackColor = Color.White; grid.ColumnHeadersDefaultCellStyle.ForeColor = Coffee; grid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single; grid.DefaultCellStyle.SelectionBackColor = Coffee; grid.DefaultCellStyle.SelectionForeColor = Color.White;
+        var checkIn = new Button { Text = "Check in guest", Left = 0, Top = 565, Width = 160, Height = 40 }; StylePrimaryAction(checkIn);
+        var checkOut = new Button { Text = "Check out guest", Left = 175, Top = 565, Width = 165, Height = 40 }; StyleSecondaryAction(checkOut);
+        var details = new Button { Text = "View stay details", Left = 355, Top = 565, Width = 160, Height = 40 }; StyleSecondaryAction(details);
+        _content.Controls.AddRange([searchFrame, grid, checkIn, checkOut, details]);
+        async Task RefreshAsync()
+        {
+            grid.Rows.Clear();
+            foreach (var item in await _repository.GetReservationsAsync(search.Text))
+            {
+                var row = grid.Rows.Add($"R{item.Id:000}", item.GuestName, item.RoomNumber, item.CheckIn.ToString("dd MMM yyyy"), item.CheckOut.ToString("dd MMM yyyy"), item.Status);
+                grid.Rows[row].Tag = item;
+            }
+        }
+        ReservationSummary? Selected() => grid.CurrentRow?.Tag as ReservationSummary;
+        search.TextChanged += async (_, _) => await RefreshAsync();
+        checkIn.Click += async (_, _) =>
+        {
+            var item = Selected();
+            if (item is null) { MessageBox.Show(this, "Select a reservation first.", "Check-in", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            try { await _repository.CheckInReservationAsync(item.Id, DateTimeOffset.Now); await RefreshAsync(); _status.Text = $"{item.GuestName} checked in; room {item.RoomNumber} is now occupied."; }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "Check-in", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        };
+        checkOut.Click += async (_, _) =>
+        {
+            var item = Selected();
+            if (item is null) { MessageBox.Show(this, "Select a reservation first.", "Check-out", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            try { await _repository.CheckOutReservationAsync(item.Id, DateTimeOffset.Now); await RefreshAsync(); _status.Text = $"{item.GuestName} checked out; room {item.RoomNumber} is available again."; }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "Check-out", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        };
+        details.Click += (_, _) =>
+        {
+            var item = Selected();
+            if (item is null) { MessageBox.Show(this, "Select a reservation first.", "Stay details", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            var arrival = item.ActualCheckIn?.ToLocalTime().ToString("dd MMM yyyy, h:mm tt") ?? "Not checked in";
+            var departure = item.ActualCheckOut?.ToLocalTime().ToString("dd MMM yyyy, h:mm tt") ?? "Not checked out";
+            MessageBox.Show(this, $"Guest: {item.GuestName}\nRoom: {item.RoomNumber}\nBooked stay: {item.CheckIn:dd MMM yyyy} – {item.CheckOut:dd MMM yyyy}\nActual arrival: {arrival}\nActual departure: {departure}\nStatus: {item.Status}", $"Reservation R{item.Id:000}", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        };
+        _ = RefreshAsync();
+    }
 
     private static Panel Card(string text, int left, int top, int width, int height)
     {

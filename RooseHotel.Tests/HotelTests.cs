@@ -177,6 +177,50 @@ public sealed class HotelTests
         finally { DeleteTestFolder(folder); }
     }
 
+    [Fact]
+    public async Task CheckInAndOut_UpdatesRoomAvailabilityAndMigratesExistingDatabase()
+    {
+        var (repository, folder) = CreateRepository();
+        try
+        {
+            var databasePath = Path.Combine(folder, "test.db");
+            await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+            {
+                await connection.OpenAsync();
+                var legacySchema = connection.CreateCommand();
+                legacySchema.CommandText = "CREATE TABLE Reservations (Id INTEGER PRIMARY KEY AUTOINCREMENT, GuestId INTEGER NOT NULL, RoomId INTEGER NOT NULL, CheckIn TEXT NOT NULL, CheckOut TEXT NOT NULL, Status TEXT NOT NULL DEFAULT 'Confirmed', CHECK (CheckOut > CheckIn));";
+                await legacySchema.ExecuteNonQueryAsync();
+            }
+
+            await repository.InitializeAsync();
+            var room = (await repository.GetRoomsAsync()).First();
+            var guestId = await repository.CreateGuestAsync(new Guest(0, "Arrival Guest", "08000000000", "arrival@example.test"));
+            var today = DateOnly.FromDateTime(DateTime.Now);
+            var checkInAt = DateTimeOffset.Now;
+            var reservationId = await repository.CreateReservationAsync(new ReservationRequest(guestId, room.Id, today, today.AddDays(2)));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => repository.CheckInReservationAsync(reservationId, checkInAt.AddDays(-1)));
+            await repository.CheckInReservationAsync(reservationId, checkInAt);
+
+            var occupiedRoom = (await repository.GetRoomsAsync()).Single(item => item.Id == room.Id);
+            Assert.True(occupiedRoom.IsOccupied);
+            Assert.Equal("Occupied", occupiedRoom.DisplayStatus);
+            Assert.DoesNotContain(await repository.FindAvailableRoomsAsync(today, today.AddDays(1)), item => item.Id == room.Id);
+            var checkedIn = (await repository.GetReservationsAsync("Arrival Guest")).Single();
+            Assert.Equal(ReservationStatus.CheckedIn, checkedIn.Status);
+            Assert.NotNull(checkedIn.ActualCheckIn);
+
+            await repository.CheckOutReservationAsync(reservationId, checkInAt.AddMinutes(30));
+            var availableRoom = (await repository.GetRoomsAsync()).Single(item => item.Id == room.Id);
+            Assert.False(availableRoom.IsOccupied);
+            Assert.Equal("Available", availableRoom.DisplayStatus);
+            Assert.Contains(await repository.FindAvailableRoomsAsync(today, today.AddDays(1)), item => item.Id == room.Id);
+            var checkedOut = (await repository.GetReservationsAsync("Arrival Guest")).Single();
+            Assert.Equal(ReservationStatus.CheckedOut, checkedOut.Status);
+            Assert.NotNull(checkedOut.ActualCheckOut);
+        }
+        finally { DeleteTestFolder(folder); }
+    }
+
     private static (SqliteHotelRepository Repository, string Folder) CreateRepository()
     {
         var folder = Path.Combine(Path.GetTempPath(), $"RooseHotel.Tests.{Guid.NewGuid():N}");
