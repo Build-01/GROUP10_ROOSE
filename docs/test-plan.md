@@ -20,7 +20,7 @@
 | UT-03 | FR-07 | Check-out is before check-in. | Date range is rejected. | Pending execution |
 | UT-04 | FR-07 | Existing 10–12 Nov; requested 12–14 Nov. | No overlap. | Pending execution |
 | UT-05 | FR-07 | Existing 10–12 Nov; requested 11–13 Nov. | Overlap detected. | Pending execution |
-| UT-06 | FR-09 | Rate ₦120,000; three nights. | Charge is ₦360,000. | Pending execution |
+| UT-06 | FR-09 | Rate ₦120,000; three nights. | Charge is ₦360,000. | Passed (26 Nov 2026) |
 | IT-01 | FR-11 | Initialize an empty database. | Schema and expected 30 seed rooms are created once. | Pending execution |
 | IT-02 | FR-05 | Search dates conflicting with a confirmed reservation. | The reserved room is omitted. | Passed (26 Nov 2026) |
 | IT-03 | FR-06/07 | Insert overlapping reservation for the same room. | Operation is rejected and no duplicate row is saved. | Passed (26 Nov 2026) |
@@ -33,6 +33,7 @@
 | IT-10 | FR-04 | Register a guest with name, phone, and email. | Guest record is saved and searchable by name, phone, and email. | Passed (26 Nov 2026) |
 | IT-11 | FR-04 | Update a guest's contact details. | Updated name, phone, and email persist. | Passed (26 Nov 2026) |
 | IT-12 | FR-06/07/08 | Create overlapping and adjacent stays, update a confirmed reservation, cancel it, then search the released dates. | Overlap is rejected, adjacent stay is allowed, update persists, and cancellation frees availability. | Passed (26 Nov 2026) |
+| IT-13 | FR-09 | Load a reservation summary for a ₦120,000 room and three nights. | Summary reports the saved rate, three nights, and ₦360,000 charge. | Passed (26 Nov 2026) |
 | ST-01 | FR-01/02 | Sign in and open dashboard. | Authorized staff sees current summary. | Pending execution |
 | ST-02 | FR-04–09 | Register a guest and complete a valid booking. | Reservation and charge summary are correct. | Pending execution |
 | ST-03 | FR-10 | Check in then check out an eligible reservation. | State changes are recorded in order. | Pending execution |
@@ -50,6 +51,10 @@ System walkthroughs and screenshots remain planned acceptance/release evidence.
 ### 2026-11-26 — Phase 4 verification
 
 Command: `dotnet test RooseHotel.Tests/RooseHotel.Tests.csproj --no-restore --verbosity minimal --logger "console;verbosity=minimal"` — **8 passed, 0 failed, 0 skipped**. The reservation lifecycle check verifies overlap rejection, adjacent dates, update persistence, cancellation status, and released-room availability. App build: `dotnet build RooseHotel.App/RooseHotel.App.csproj --no-restore --verbosity minimal -p:BaseOutputPath=bin/phase4/ -p:UseSharedCompilation=false` — **0 warnings, 0 errors**. Manual reservation UI walkthrough/screenshot remains for release evidence.
+
+### 2026-11-26 — Phase 5 verification
+
+Command: `dotnet test RooseHotel.Tests/RooseHotel.Tests.csproj --no-restore --verbosity minimal --logger "console;verbosity=minimal"` — **9 passed, 0 failed, 0 skipped**. Billing check: a three-night reservation in a ₦120,000 room returned a ₦360,000 accommodation total; test cases UT-06 and IT-13 passed. App build: `dotnet build RooseHotel.App/RooseHotel.App.csproj --no-restore --verbosity minimal -p:BaseOutputPath=bin/phase5/ -p:UseSharedCompilation=false` — **0 warnings, 0 errors**. Manual billing screen walkthrough/screenshot remains for release evidence.
 
 ### 2026-11-26 — Phase 3 verification
 

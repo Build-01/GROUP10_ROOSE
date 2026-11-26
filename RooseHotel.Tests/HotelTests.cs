@@ -156,6 +156,27 @@ public sealed class HotelTests
         finally { DeleteTestFolder(folder); }
     }
 
+    [Fact]
+    public async Task BillingSummary_UsesSavedRoomRateAndReservationNights()
+    {
+        var (repository, folder) = CreateRepository();
+        try
+        {
+            await repository.InitializeAsync();
+            var room = (await repository.GetRoomsAsync()).First(item => item.NightlyRate == 120_000m);
+            var guestId = await repository.CreateGuestAsync(new Guest(0, "Billing Guest", "08000000000", "billing@example.test"));
+            var id = await repository.CreateReservationAsync(new ReservationRequest(guestId, room.Id,
+                new DateOnly(2026, 12, 10), new DateOnly(2026, 12, 13)));
+
+            var summary = (await repository.GetReservationsAsync("Billing Guest")).Single();
+            Assert.Equal(id, summary.Id);
+            Assert.Equal(3, summary.Nights);
+            Assert.Equal(120_000m, summary.NightlyRate);
+            Assert.Equal(360_000m, ReservationRules.CalculateCharge(summary.NightlyRate, summary.CheckIn, summary.CheckOut));
+        }
+        finally { DeleteTestFolder(folder); }
+    }
+
     private static (SqliteHotelRepository Repository, string Folder) CreateRepository()
     {
         var folder = Path.Combine(Path.GetTempPath(), $"RooseHotel.Tests.{Guid.NewGuid():N}");

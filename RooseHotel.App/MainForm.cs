@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Drawing.Printing;
 using RooseHotel.Core;
 using RooseHotel.Data;
 
@@ -51,6 +52,7 @@ public sealed class MainForm : Form
         nav.Controls.Add(NavButton("Availability", ShowAvailability));
         nav.Controls.Add(NavButton("Guests", ShowGuests));
         nav.Controls.Add(NavButton("Reservations", ShowReservations));
+        nav.Controls.Add(NavButton("Billing", ShowBilling));
         nav.Controls.Add(NavButton("Check-in / Check-out", () => ShowComingSoon("Check-in / Check-out")));
         sidebar.Controls.Add(nav);
         sidebar.Controls.Add(new Label { Text = "STAFF WORKSPACE", Dock = DockStyle.Bottom, Height = 35, ForeColor = Coffee, TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI", 8F, FontStyle.Bold) });
@@ -383,6 +385,72 @@ public sealed class MainForm : Form
         };
         _ = RefreshAsync();
     }
+
+    private void ShowBilling()
+    {
+        PreparePage("Billing Summary", "Review accommodation charges using the room's saved nightly rate.");
+        var selector = new ComboBox { Left = 0, Top = 116, Width = 500, DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Coffee };
+        var selectorFrame = GoldInput(selector, 0, 112, 520, 38);
+        var summary = Card("Select a reservation to view its accommodation charge.", 0, 176, 850, 285);
+        var print = new Button { Text = "Print summary", Left = 0, Top = 485, Width = 165, Height = 40, Enabled = false };
+        StylePrimaryAction(print);
+        _content.Controls.AddRange([selectorFrame, summary, print]);
+        ReservationSummary? selected = null;
+
+        void ShowSelected()
+        {
+            if (selector.SelectedItem is not BillingChoice choice) return;
+            selected = choice.Reservation;
+            var total = ReservationRules.CalculateCharge(selected.NightlyRate, selected.CheckIn, selected.CheckOut);
+            summary.Controls.Clear();
+            summary.Controls.Add(new Label { Text = $"Reservation R{selected.Id:000}  ·  {selected.Status}", Left = 20, Top = 16, Width = 790, Height = 30, ForeColor = Coffee, Font = new Font("Georgia", 17F, FontStyle.Bold) });
+            summary.Controls.Add(new Label { Text = $"Guest: {selected.GuestName}\nRoom: {selected.RoomNumber}\nStay: {selected.CheckIn:dd MMM yyyy} to {selected.CheckOut:dd MMM yyyy}", Left = 20, Top = 65, Width = 430, Height = 105, ForeColor = Coffee, Font = new Font("Segoe UI", 11F) });
+            summary.Controls.Add(new Label { Text = "Accommodation calculation", Left = 20, Top = 184, Width = 450, Height = 24, ForeColor = Coffee, Font = new Font("Segoe UI", 10F, FontStyle.Bold) });
+            summary.Controls.Add(new Label { Text = $"{selected.Nights} night(s)  ×  ₦{selected.NightlyRate:N0}", Left = 20, Top = 215, Width = 520, Height = 28, ForeColor = Coffee });
+            summary.Controls.Add(new Label { Text = $"₦{total:N0}", Left = 575, Top = 198, Width = 235, Height = 48, ForeColor = Coffee, Font = new Font("Georgia", 24F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleRight });
+            summary.Invalidate();
+            print.Enabled = true;
+        }
+
+        selector.SelectedIndexChanged += (_, _) => ShowSelected();
+        print.Click += (_, _) =>
+        {
+            if (selected is null) return;
+            var printable = selected;
+            using var document = new PrintDocument();
+            document.DocumentName = $"ROOSE Hotel Reservation R{printable.Id:000}";
+            document.PrintPage += (_, e) =>
+            {
+                if (e.Graphics is not { } graphics) return;
+                using var heading = new Font("Georgia", 22F, FontStyle.Bold);
+                using var regular = new Font("Segoe UI", 12F);
+                using var bold = new Font("Segoe UI", 13F, FontStyle.Bold);
+                graphics.DrawString("ROOSE HOTEL", heading, Brushes.SaddleBrown, 70, 70);
+                graphics.DrawString("Accommodation Billing Summary", bold, Brushes.SaddleBrown, 70, 125);
+                graphics.DrawString($"Reservation: R{printable.Id:000}\nGuest: {printable.GuestName}\nRoom: {printable.RoomNumber}\nCheck-in: {printable.CheckIn:dd MMM yyyy}\nCheck-out: {printable.CheckOut:dd MMM yyyy}\nNights: {printable.Nights}\nNightly rate: ₦{printable.NightlyRate:N0}", regular, Brushes.Black, 70, 190);
+                graphics.DrawString($"Total accommodation charge: ₦{ReservationRules.CalculateCharge(printable.NightlyRate, printable.CheckIn, printable.CheckOut):N0}", bold, Brushes.SaddleBrown, 70, 380);
+                e.HasMorePages = false;
+            };
+            using var preview = new PrintPreviewDialog { Document = document, Width = 900, Height = 700 };
+            preview.ShowDialog(this);
+        };
+
+        _ = LoadReservationsAsync();
+        async Task LoadReservationsAsync()
+        {
+            try
+            {
+                var items = (await _repository.GetReservationsAsync(""))
+                    .Where(item => item.Status != ReservationStatus.Cancelled).ToList();
+                selector.DisplayMember = nameof(BillingChoice.Label);
+                selector.DataSource = items.Select(item => new BillingChoice(item, $"R{item.Id:000} · {item.GuestName} · Room {item.RoomNumber}")).ToList();
+                if (items.Count == 0) _status.Text = "No billable reservations are available yet.";
+            }
+            catch (Exception ex) { _status.Text = $"Could not load billing data: {ex.Message}"; }
+        }
+    }
+
+    private sealed record BillingChoice(ReservationSummary Reservation, string Label);
 
     private static Panel Card(string text, int left, int top, int width, int height)
     {

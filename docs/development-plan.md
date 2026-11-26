@@ -30,7 +30,8 @@ Each completed increment is recorded as a separate, reviewable Git change set wi
 | 2. Room management | Complete | Room add, edit, details, search, and filters are implemented. Automated verification: 6/6 xUnit tests passed on 26 Nov 2026 (.NET 9.0.9 runtime, VSTest 17.14.1). Room screen walkthrough/screenshot is retained as a manual evidence item for the final release package. |
 | 3. Guest management | Complete | Guest registration, search by name/phone/email, and contact editing are implemented. Full solution build succeeded with 0 warnings/errors; all 7 automated tests passed on 26 Nov 2026. Guest screen walkthrough/screenshot remains a manual release evidence item. |
 | 4. Reservations | Complete | Availability search, reservation list/search, create, edit, cancel, and detail views are implemented. Build and automated test evidence is logged below; manual reservation walkthrough remains release evidence. |
-| 5. Accommodation billing | In progress | Next increment: provide a billing summary workflow using reservation nights and the assigned room rate. |
+| 5. Accommodation billing | Complete | Added a reservation-based billing summary with guest, room, stay dates, night count, saved nightly rate, total, and print preview. Verification on 26 Nov 2026: app build 0 warnings/errors; 9/9 automated tests passed. Manual billing screenshot remains release evidence. |
+| 6. Check-in and check-out | In progress | Next increment: validate reservation state changes on arrival/departure and update room occupancy/availability. |
 
 ## Team responsibilities
 
