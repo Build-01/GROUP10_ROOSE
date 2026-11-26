@@ -112,6 +112,49 @@ public sealed class SqliteHotelRepository(string databasePath) : IHotelRepositor
         return rooms;
     }
 
+    public async Task<int> AddRoomAsync(Room room, CancellationToken cancellationToken = default)
+    {
+        ValidateRoom(room);
+        await using var connection = OpenConnection();
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "INSERT INTO Rooms(Number, Category, NightlyRate, Capacity, OperationalStatus) VALUES($number, $category, $rate, $capacity, $status); SELECT last_insert_rowid();";
+        AddRoomParameters(command, room);
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken));
+    }
+
+    public async Task UpdateRoomAsync(Room room, CancellationToken cancellationToken = default)
+    {
+        ValidateRoom(room);
+        if (room.Id <= 0) throw new ArgumentOutOfRangeException(nameof(room), "A saved room ID is required for updates.");
+        await using var connection = OpenConnection();
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "UPDATE Rooms SET Number=$number, Category=$category, NightlyRate=$rate, Capacity=$capacity, OperationalStatus=$status WHERE Id=$id;";
+        AddRoomParameters(command, room);
+        command.Parameters.AddWithValue("$id", room.Id);
+        if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
+            throw new KeyNotFoundException($"Room {room.Number} was not found.");
+    }
+
+    private static void ValidateRoom(Room room)
+    {
+        if (string.IsNullOrWhiteSpace(room.Number)) throw new ArgumentException("Room number is required.");
+        if (room.NightlyRate < 0) throw new ArgumentOutOfRangeException(nameof(room), "Nightly rate cannot be negative.");
+        if (room.Capacity < 1) throw new ArgumentOutOfRangeException(nameof(room), "Room capacity must be at least one.");
+        if (!Enum.IsDefined(room.Category)) throw new ArgumentOutOfRangeException(nameof(room), "Choose a valid room category.");
+        if (!Enum.IsDefined(room.OperationalStatus)) throw new ArgumentOutOfRangeException(nameof(room), "Choose a valid room status.");
+    }
+
+    private static void AddRoomParameters(SqliteCommand command, Room room)
+    {
+        command.Parameters.AddWithValue("$number", room.Number.Trim());
+        command.Parameters.AddWithValue("$category", room.Category.ToString());
+        command.Parameters.AddWithValue("$rate", room.NightlyRate);
+        command.Parameters.AddWithValue("$capacity", room.Capacity);
+        command.Parameters.AddWithValue("$status", room.OperationalStatus.ToString());
+    }
+
     public async Task<IReadOnlyList<Room>> FindAvailableRoomsAsync(DateOnly checkIn, DateOnly checkOut,
         CancellationToken cancellationToken = default)
     {

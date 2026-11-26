@@ -120,26 +120,104 @@ public sealed class MainForm : Form
 
     private void ShowRooms()
     {
-        PreparePage("Room Management", "Browse the 30 rooms configured for ROOSE Hotel.");
-        _ = LoadRoomsAsync(_content);
+        PreparePage("Room Management", "Search and maintain room details, rates, capacity, and operating status.");
+        var search = new TextBox { PlaceholderText = "Search room number...", BorderStyle = BorderStyle.None, BackColor = Color.White, ForeColor = Coffee };
+        var searchFrame = GoldInput(search, 0, 112, 245, 34);
+        var category = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Coffee };
+        category.DataSource = new[] { "All categories" }.Concat(Enum.GetValues<RoomCategory>().Select(FormatCategory)).ToList();
+        var categoryFrame = GoldInput(category, 260, 112, 180, 34);
+        var status = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Coffee };
+        status.DataSource = new[] { "All statuses" }.Concat(Enum.GetNames<RoomOperationalStatus>()).ToList();
+        var statusFrame = GoldInput(status, 455, 112, 165, 34);
+        var add = new Button { Text = "Add room", Left = 790, Top = 108, Width = 155, Height = 38 };
+        StylePrimaryAction(add);
+        var grid = CreateRoomGrid();
+        grid.Left = 0;
+        grid.Top = 163;
+        grid.Width = 970;
+        grid.Height = 430;
+        var edit = new Button { Text = "Edit selected", Left = 0, Top = 610, Width = 160, Height = 38 };
+        StylePrimaryAction(edit);
+        var details = new Button { Text = "View details", Left = 175, Top = 610, Width = 150, Height = 38 };
+        StyleSecondaryAction(details);
+        _content.Controls.AddRange([searchFrame, categoryFrame, statusFrame, add, grid, edit, details]);
+
+        async Task RefreshAsync() => await RefreshRoomGridAsync(grid, search.Text, category.SelectedItem?.ToString(), status.SelectedItem?.ToString());
+        search.TextChanged += async (_, _) => await RefreshAsync();
+        category.SelectedIndexChanged += async (_, _) => await RefreshAsync();
+        status.SelectedIndexChanged += async (_, _) => await RefreshAsync();
+        add.Click += async (_, _) =>
+        {
+            using var editor = new RoomEditorForm();
+            if (editor.ShowDialog(this) != DialogResult.OK) return;
+            try
+            {
+                await _repository.AddRoomAsync(editor.RoomToSave);
+                await RefreshAsync();
+                _status.Text = $"Room {editor.RoomToSave.Number} added.";
+            }
+            catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 19)
+            {
+                MessageBox.Show(this, "That room number is already in use.", "Room management", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "Room management", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        };
+        edit.Click += async (_, _) =>
+        {
+            if (SelectedRoom(grid) is not { } room)
+            {
+                MessageBox.Show(this, "Select a room to edit.", "Room management", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            using var editor = new RoomEditorForm(room);
+            if (editor.ShowDialog(this) != DialogResult.OK) return;
+            try
+            {
+                await _repository.UpdateRoomAsync(editor.RoomToSave);
+                await RefreshAsync();
+                _status.Text = $"Room {editor.RoomToSave.Number} updated.";
+            }
+            catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 19)
+            {
+                MessageBox.Show(this, "That room number is already in use.", "Room management", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "Room management", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        };
+        details.Click += (_, _) =>
+        {
+            if (SelectedRoom(grid) is not { } room)
+            {
+                MessageBox.Show(this, "Select a room to view its details.", "Room management", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            MessageBox.Show(this,
+                $"Room: {room.Number}\nCategory: {FormatCategory(room.Category)}\nNightly rate: {room.NightlyRate:N0} NGN\nCapacity: {room.Capacity}\nOperational status: {room.OperationalStatus}",
+                $"Room {room.Number}", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        };
+        _ = RefreshAsync();
     }
 
-    private async Task LoadRoomsAsync(Control host)
+    private async Task RefreshRoomGridAsync(DataGridView grid, string query, string? category, string? status)
     {
         try
         {
             var rooms = await _repository.GetRoomsAsync();
-            if (host.IsDisposed || host.Controls.Count == 0) return;
-            var grid = CreateRoomGrid();
-            foreach (var room in rooms) AddRoomRow(grid, room, room.OperationalStatus.ToString());
-            grid.Left = 0;
-            grid.Top = 105;
-            grid.Width = 900;
-            grid.Height = 520;
-            host.Controls.Add(grid);
+            if (grid.IsDisposed) return;
+            grid.Rows.Clear();
+            foreach (var room in rooms.Where(r =>
+                (string.IsNullOrWhiteSpace(query) || r.Number.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase)) &&
+                (string.IsNullOrWhiteSpace(category) || category == "All categories" || FormatCategory(r.Category) == category) &&
+                (string.IsNullOrWhiteSpace(status) || status == "All statuses" || r.OperationalStatus.ToString() == status)))
+            {
+                var index = grid.Rows.Add(room.Number, FormatCategory(room.Category), room.Capacity,
+                    room.NightlyRate.ToString("₦#,##0", CultureInfo.GetCultureInfo("en-NG")), room.OperationalStatus);
+                grid.Rows[index].Tag = room;
+            }
         }
         catch (Exception ex) { _status.Text = $"Could not load rooms: {ex.Message}"; }
     }
+
+    private static Room? SelectedRoom(DataGridView grid) => grid.CurrentRow?.Tag as Room;
 
     private void ShowAvailability()
     {
@@ -244,5 +322,27 @@ public sealed class MainForm : Form
         button.FlatAppearance.BorderSize = 1;
         button.FlatAppearance.MouseOverBackColor = Color.FromArgb(110, 74, 51);
         button.Cursor = Cursors.Hand;
+    }
+
+    private static void StyleSecondaryAction(Button button)
+    {
+        button.FlatStyle = FlatStyle.Flat;
+        button.BackColor = Color.White;
+        button.ForeColor = Coffee;
+        button.FlatAppearance.BorderColor = Gold;
+        button.FlatAppearance.BorderSize = 1;
+        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(250, 247, 242);
+        button.Cursor = Cursors.Hand;
+    }
+
+    private static Panel GoldInput(Control input, int left, int top, int width, int height)
+    {
+        var frame = new Panel { Left = left, Top = top, Width = width, Height = height, BackColor = Color.White };
+        frame.Paint += (_, e) => { using var pen = new Pen(input.Focused ? Coffee : Gold, 1F); e.Graphics.DrawRectangle(pen, 0, 0, frame.Width - 2, frame.Height - 2); };
+        input.SetBounds(6, 5, width - 12, height - 10);
+        input.GotFocus += (_, _) => frame.Invalidate();
+        input.LostFocus += (_, _) => frame.Invalidate();
+        frame.Controls.Add(input);
+        return frame;
     }
 }
