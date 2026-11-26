@@ -50,7 +50,7 @@ public sealed class MainForm : Form
         nav.Controls.Add(NavButton("Rooms", ShowRooms));
         nav.Controls.Add(NavButton("Availability", ShowAvailability));
         nav.Controls.Add(NavButton("Guests", ShowGuests));
-        nav.Controls.Add(NavButton("Reservations", () => ShowComingSoon("Reservation Management")));
+        nav.Controls.Add(NavButton("Reservations", ShowReservations));
         nav.Controls.Add(NavButton("Check-in / Check-out", () => ShowComingSoon("Check-in / Check-out")));
         sidebar.Controls.Add(nav);
         sidebar.Controls.Add(new Label { Text = "STAFF WORKSPACE", Dock = DockStyle.Bottom, Height = 35, ForeColor = Coffee, TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI", 8F, FontStyle.Bold) });
@@ -320,6 +320,66 @@ public sealed class MainForm : Form
             if (form.ShowDialog(this) != DialogResult.OK) return;
             try { await _repository.UpdateGuestAsync(form.GuestToSave); await RefreshAsync(); _status.Text = "Guest details updated."; }
             catch (Exception ex) { MessageBox.Show(this, ex.Message, "Guest management", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        };
+        _ = RefreshAsync();
+    }
+
+    private void ShowReservations()
+    {
+        PreparePage("Reservation Management", "Create and maintain confirmed stays. Dates use check-in inclusive and check-out exclusive.");
+        var search = new TextBox { BorderStyle = BorderStyle.None, BackColor = Color.White, ForeColor = Coffee, PlaceholderText = "Search reservation, guest, room, or status..." };
+        var searchFrame = GoldInput(search, 0, 112, 390, 36);
+        var grid = new DataGridView { Left = 0, Top = 165, Width = 940, Height = 385, ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, MultiSelect = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, RowHeadersVisible = false, BackgroundColor = Color.White, BorderStyle = BorderStyle.None };
+        grid.Columns.Add("id", "Reservation"); grid.Columns.Add("guest", "Guest"); grid.Columns.Add("room", "Room"); grid.Columns.Add("checkin", "Check-in"); grid.Columns.Add("checkout", "Check-out"); grid.Columns.Add("status", "Status");
+        grid.EnableHeadersVisualStyles = false; grid.ColumnHeadersDefaultCellStyle.BackColor = Color.White; grid.ColumnHeadersDefaultCellStyle.ForeColor = Coffee; grid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single; grid.DefaultCellStyle.SelectionBackColor = Coffee; grid.DefaultCellStyle.SelectionForeColor = Color.White;
+        var add = new Button { Text = "New reservation", Left = 0, Top = 570, Width = 170, Height = 40 }; StylePrimaryAction(add);
+        var edit = new Button { Text = "Edit selected", Left = 185, Top = 570, Width = 145, Height = 40 }; StyleSecondaryAction(edit);
+        var cancel = new Button { Text = "Cancel selected", Left = 345, Top = 570, Width = 155, Height = 40 }; StyleSecondaryAction(cancel);
+        var details = new Button { Text = "View details", Left = 515, Top = 570, Width = 135, Height = 40 }; StyleSecondaryAction(details);
+        _content.Controls.AddRange([searchFrame, grid, add, edit, cancel, details]);
+        async Task RefreshAsync()
+        {
+            grid.Rows.Clear();
+            foreach (var item in await _repository.GetReservationsAsync(search.Text))
+            {
+                var row = grid.Rows.Add($"R{item.Id:000}", item.GuestName, item.RoomNumber, item.CheckIn.ToString("dd MMM yyyy"), item.CheckOut.ToString("dd MMM yyyy"), item.Status);
+                grid.Rows[row].Tag = item;
+            }
+        }
+        async Task OpenEditorAsync(ReservationSummary? selected)
+        {
+            var guests = await _repository.SearchGuestsAsync("");
+            var rooms = await _repository.GetRoomsAsync();
+            if (guests.Count == 0) { MessageBox.Show(this, "Register a guest before creating a reservation.", "Reservations", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            using var form = new ReservationEditorForm(guests, rooms, selected);
+            if (form.ShowDialog(this) != DialogResult.OK) return;
+            try
+            {
+                if (selected is null) await _repository.CreateReservationAsync(form.Request);
+                else await _repository.UpdateReservationAsync(new ReservationUpdateRequest(selected.Id, form.Request.GuestId, form.Request.RoomId, form.Request.CheckIn, form.Request.CheckOut));
+                await RefreshAsync(); _status.Text = selected is null ? "Reservation created." : "Reservation updated.";
+            }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "Reservations", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        }
+        search.TextChanged += async (_, _) => await RefreshAsync();
+        add.Click += async (_, _) => await OpenEditorAsync(null);
+        edit.Click += async (_, _) =>
+        {
+            if (grid.CurrentRow?.Tag is not ReservationSummary selected) { MessageBox.Show(this, "Select a reservation first.", "Reservations", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            if (selected.Status != ReservationStatus.Confirmed) { MessageBox.Show(this, "Only confirmed reservations can be edited.", "Reservations", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            await OpenEditorAsync(selected);
+        };
+        cancel.Click += async (_, _) =>
+        {
+            if (grid.CurrentRow?.Tag is not ReservationSummary selected) { MessageBox.Show(this, "Select a reservation first.", "Reservations", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            if (MessageBox.Show(this, $"Cancel reservation R{selected.Id:000} for {selected.GuestName}?", "Confirm cancellation", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            try { await _repository.CancelReservationAsync(selected.Id); await RefreshAsync(); _status.Text = "Reservation cancelled."; }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "Reservations", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        };
+        details.Click += (_, _) =>
+        {
+            if (grid.CurrentRow?.Tag is not ReservationSummary selected) { MessageBox.Show(this, "Select a reservation first.", "Reservations", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            MessageBox.Show(this, $"Guest: {selected.GuestName}\nRoom: {selected.RoomNumber}\nDates: {selected.CheckIn:dd MMM yyyy} – {selected.CheckOut:dd MMM yyyy}\nNights: {selected.Nights}\nAccommodation: ₦{selected.NightlyRate * selected.Nights:N0}\nStatus: {selected.Status}", $"Reservation R{selected.Id:000}", MessageBoxButtons.OK, MessageBoxIcon.Information);
         };
         _ = RefreshAsync();
     }

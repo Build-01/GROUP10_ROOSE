@@ -267,6 +267,75 @@ public sealed class SqliteHotelRepository(string databasePath) : IHotelRepositor
         return id;
     }
 
+    public async Task<IReadOnlyList<ReservationSummary>> GetReservationsAsync(string query = "", CancellationToken cancellationToken = default)
+    {
+        await using var connection = OpenConnection();
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT b.Id, b.GuestId, g.FullName, r.Number, r.NightlyRate, b.CheckIn, b.CheckOut, b.Status
+            FROM Reservations b JOIN Guests g ON g.Id=b.GuestId JOIN Rooms r ON r.Id=b.RoomId
+            WHERE CAST(b.Id AS TEXT) LIKE $query OR g.FullName LIKE $query OR r.Number LIKE $query OR b.Status LIKE $query
+            ORDER BY b.Id DESC;
+            """;
+        command.Parameters.AddWithValue("$query", $"%{query.Trim()}%");
+        var items = new List<ReservationSummary>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            items.Add(new ReservationSummary(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3), reader.GetDecimal(4),
+                DateOnly.Parse(reader.GetString(5)), DateOnly.Parse(reader.GetString(6)), Enum.Parse<ReservationStatus>(reader.GetString(7))));
+        return items;
+    }
+
+    public async Task UpdateReservationAsync(ReservationUpdateRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request.ReservationId <= 0 || !ReservationRules.HasValidDates(request.CheckIn, request.CheckOut))
+            throw new ArgumentException("Choose a valid reservation and a check-out date later than check-in.");
+        await using var connection = OpenConnection();
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var check = connection.CreateCommand();
+        check.Transaction = (SqliteTransaction)transaction;
+        check.CommandText = """
+            SELECT COUNT(*) FROM Reservations current
+            JOIN Rooms r ON r.Id=$roomId
+            WHERE current.Id=$id AND current.Status='Confirmed' AND r.OperationalStatus='Available'
+              AND EXISTS (SELECT 1 FROM Guests WHERE Id=$guestId)
+              AND NOT EXISTS (SELECT 1 FROM Reservations other WHERE other.Id<>$id AND other.RoomId=$roomId
+                AND other.Status IN ('Confirmed','CheckedIn') AND other.CheckIn<$checkOut AND $checkIn<other.CheckOut);
+            """;
+        AddReservationEditParameters(check, request);
+        if (Convert.ToInt64(await check.ExecuteScalarAsync(cancellationToken)) != 1)
+            throw new InvalidOperationException("The reservation cannot be updated because the guest, room, or dates are unavailable.");
+        var update = connection.CreateCommand();
+        update.Transaction = (SqliteTransaction)transaction;
+        update.CommandText = "UPDATE Reservations SET GuestId=$guestId, RoomId=$roomId, CheckIn=$checkIn, CheckOut=$checkOut WHERE Id=$id AND Status='Confirmed';";
+        AddReservationEditParameters(update, request);
+        if (await update.ExecuteNonQueryAsync(cancellationToken) != 1)
+            throw new InvalidOperationException("Only confirmed reservations can be edited.");
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    private static void AddReservationEditParameters(SqliteCommand command, ReservationUpdateRequest request)
+    {
+        command.Parameters.AddWithValue("$id", request.ReservationId);
+        command.Parameters.AddWithValue("$guestId", request.GuestId);
+        command.Parameters.AddWithValue("$roomId", request.RoomId);
+        command.Parameters.AddWithValue("$checkIn", request.CheckIn.ToString("yyyy-MM-dd"));
+        command.Parameters.AddWithValue("$checkOut", request.CheckOut.ToString("yyyy-MM-dd"));
+    }
+
+    public async Task CancelReservationAsync(int reservationId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = OpenConnection();
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "UPDATE Reservations SET Status='Cancelled' WHERE Id=$id AND Status='Confirmed';";
+        command.Parameters.AddWithValue("$id", reservationId);
+        if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
+            throw new InvalidOperationException("Only confirmed reservations can be cancelled.");
+    }
+
     private static Room ReadRoom(SqliteDataReader reader) => new(reader.GetInt32(0), reader.GetString(1),
         Enum.Parse<RoomCategory>(reader.GetString(2)), reader.GetDecimal(3), reader.GetInt32(4),
         Enum.Parse<RoomOperationalStatus>(reader.GetString(5)));

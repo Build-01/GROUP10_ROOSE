@@ -45,6 +45,12 @@ public sealed record Reservation(int Id, int GuestId, int RoomId, DateOnly Check
 }
 
 public sealed record ReservationRequest(int GuestId, int RoomId, DateOnly CheckIn, DateOnly CheckOut);
+public sealed record ReservationUpdateRequest(int ReservationId, int GuestId, int RoomId, DateOnly CheckIn, DateOnly CheckOut);
+public sealed record ReservationSummary(int Id, int GuestId, string GuestName, string RoomNumber, decimal NightlyRate,
+    DateOnly CheckIn, DateOnly CheckOut, ReservationStatus Status)
+{
+    public int Nights => CheckOut.DayNumber - CheckIn.DayNumber;
+}
 
 public static class ReservationRules
 {
@@ -83,4 +89,7 @@ public interface IHotelRepository
     Task<int> CreateGuestAsync(Guest guest, CancellationToken cancellationToken = default);
     Task UpdateGuestAsync(Guest guest, CancellationToken cancellationToken = default);
     Task<int> CreateReservationAsync(ReservationRequest request, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ReservationSummary>> GetReservationsAsync(string query = "", CancellationToken cancellationToken = default);
+    Task UpdateReservationAsync(ReservationUpdateRequest request, CancellationToken cancellationToken = default);
+    Task CancelReservationAsync(int reservationId, CancellationToken cancellationToken = default);
 }

@@ -29,7 +29,8 @@ Each completed increment is recorded as a separate, reviewable Git change set wi
 | 1. Project foundation | In progress | Application builds and opens. First-run account setup and login walkthrough evidence remain pending. |
 | 2. Room management | Complete | Room add, edit, details, search, and filters are implemented. Automated verification: 6/6 xUnit tests passed on 26 Nov 2026 (.NET 9.0.9 runtime, VSTest 17.14.1). Room screen walkthrough/screenshot is retained as a manual evidence item for the final release package. |
 | 3. Guest management | Complete | Guest registration, search by name/phone/email, and contact editing are implemented. Full solution build succeeded with 0 warnings/errors; all 7 automated tests passed on 26 Nov 2026. Guest screen walkthrough/screenshot remains a manual release evidence item. |
-| 4. Reservations | In progress | Scope follows FR-05 through FR-08: availability search, create/retrieve/update/cancel reservations, overlap rejection, and cancelled-stay availability. Implementation is the next increment. |
+| 4. Reservations | Complete | Availability search, reservation list/search, create, edit, cancel, and detail views are implemented. Build and automated test evidence is logged below; manual reservation walkthrough remains release evidence. |
+| 5. Accommodation billing | In progress | Next increment: provide a billing summary workflow using reservation nights and the assigned room rate. |
 
 ## Team responsibilities
 
