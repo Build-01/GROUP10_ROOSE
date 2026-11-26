@@ -75,6 +75,8 @@ public interface IHotelRepository
     Task<StaffAccount?> FindStaffAsync(string username, CancellationToken cancellationToken = default);
     Task CreateStaffAsync(string username, string displayName, string salt, string hash, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Room>> GetRoomsAsync(CancellationToken cancellationToken = default);
+    Task<int> AddRoomAsync(Room room, CancellationToken cancellationToken = default);
+    Task UpdateRoomAsync(Room room, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Room>> FindAvailableRoomsAsync(DateOnly checkIn, DateOnly checkOut,
         CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Guest>> SearchGuestsAsync(string query, CancellationToken cancellationToken = default);

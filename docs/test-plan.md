@@ -26,10 +26,14 @@
 | IT-03 | FR-06/07 | Insert overlapping reservation for the same room. | Operation is rejected and no duplicate row is saved. | Pending execution |
 | IT-04 | FR-08 | Cancel a reservation and search its dates. | The cancelled reservation no longer blocks the room. | Pending execution |
 | IT-05 | FR-11 | Save records, close connection, reopen database. | Saved data is still present. | Pending execution |
+| IT-06 | FR-03 | Add a room with valid details. | Room is stored and appears in the room list. | Pending execution |
+| IT-07 | FR-03 | Edit a room's category, rate, capacity, and status. | Updated values persist and appear in the room list. | Pending execution |
+| IT-08 | FR-03 | Add or rename a room to a duplicate number. | Database rejects the duplicate and UI explains the conflict. | Pending execution |
+| IT-09 | FR-03/05 | Filter the room list by number, category, and operational status. | Only rooms matching all selected filters are shown. | Pending execution |
 | ST-01 | FR-01/02 | Sign in and open dashboard. | Authorized staff sees current summary. | Pending execution |
 | ST-02 | FR-04–09 | Register a guest and complete a valid booking. | Reservation and charge summary are correct. | Pending execution |
 | ST-03 | FR-10 | Check in then check out an eligible reservation. | State changes are recorded in order. | Pending execution |
 
 ## Execution log
 
-No application test results are claimed yet. Record the build/runtime version, environment, actual result, pass/fail, defect ID, and retest result when each case is run. A test is not marked passed until the observed output is recorded.
+The core, data, app, and test projects compile. The VSTest process could not connect to its testhost after a 120-second timeout, so no automated assertions ran and all cases remain pending. Rerun `dotnet test RooseHotel.sln` in the target Windows development environment and record the build/runtime version, actual result, pass/fail, defect ID, and retest result. A test is not marked passed until the observed output is recorded.

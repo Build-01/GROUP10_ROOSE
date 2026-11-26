@@ -10,7 +10,7 @@ Group 10 will use the Incremental Development Model, as selected in the project 
 | --- | --- | --- |
 | 0. Planning and design baseline | Confirm scope, SRS, architecture, data model, UML, roles, schedule, and risks before accepting feature work. | Reviewed requirements and diagrams; agreed interfaces and schema. |
 | 1. Project foundation | Solution structure, SQLite initialization, first staff access, and dashboard. | Clean build; first-run database initialization; login/setup and dashboard walkthrough. |
-| 2. Room management | Seed and display 30 rooms across four confirmed categories; edit rates, capacities, and operational status. | Room CRUD and status test records; room list screenshot. |
+| 2. Room management | Seed and display 30 rooms; add, edit, view, search, and filter room details. | Room CRUD and status test records; room list screenshot. |
 | 3. Guest management | Register, search, view, and update guests. | Guest validation and retrieval test records; guest screen screenshot. |
 | 4. Reservations | Search availability; create, retrieve, modify, and cancel reservations; prevent date conflicts. | Boundary and overlap tests; reservation walkthrough. |
 | 5. Accommodation billing | Calculate nights and room charges from the assigned rate. | Billing calculation cases and summary screenshot. |
@@ -26,7 +26,8 @@ Each completed increment is recorded as a separate, reviewable Git change set wi
 | Increment | Status | Notes |
 | --- | --- | --- |
 | 0. Planning and design baseline | In progress | Project overview and feasibility study exist; SRS and diagram set are being assembled from the assignment and agreed scope. |
-| 1. Project foundation | Implementation built; verification pending | Three-project solution, SQLite initialization, first-run staff setup, salted password hashing, sign-in, dashboard, and early room/availability groundwork are implemented. Full solution build succeeds; first-run and sign-in walkthroughs remain to be recorded. |
+| 1. Project foundation | In progress | Application builds and opens. The prior test database has an account with an unknown password; a separate clean test database is open for first-run setup. Login walkthrough evidence is pending. |
+| 2. Room management | In progress | Room add, edit, details, search, and category/status filters are implemented. Projects compile in a separate output path; VSTest could not connect to its testhost, so assertions remain pending. |
 
 ## Team responsibilities
 

@@ -4,13 +4,19 @@ namespace RooseHotel.App;
 
 public sealed class LoginForm : Form
 {
+    private static readonly Color Coffee = Color.FromArgb(87, 58, 41);
+    private static readonly Color Gold = Color.FromArgb(190, 139, 65);
     private readonly IHotelRepository _repository;
     private readonly TextBox _username = new();
     private readonly TextBox _displayName = new();
     private readonly TextBox _password = new();
     private readonly TextBox _confirmPassword = new();
+    private Label _displayNameCaption = new();
+    private Label _passwordCaption = new();
+    private Label _confirmPasswordCaption = new();
     private readonly Label _title = new();
     private readonly Label _note = new();
+    private readonly Label _footer = new();
     private readonly Button _submit = new();
     private bool _firstRun;
 
@@ -24,41 +30,79 @@ public sealed class LoginForm : Form
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
-        ClientSize = new Size(480, 550);
-        BackColor = Color.FromArgb(250, 246, 237);
+        ClientSize = new Size(820, 660);
+        BackColor = Color.White;
         Font = new Font("Segoe UI", 10F);
 
-        var brand = new Label { Text = "ROOSE HOTEL", Left = 44, Top = 28, Width = 390, Height = 52, Font = new Font("Georgia", 24F, FontStyle.Bold), ForeColor = Color.FromArgb(105, 60, 28), TextAlign = ContentAlignment.MiddleCenter };
-        _title.SetBounds(55, 100, 370, 34);
-        _title.Font = new Font("Segoe UI", 16F, FontStyle.Bold);
-        _title.ForeColor = Color.FromArgb(58, 33, 18);
-        _note.SetBounds(55, 137, 370, 42);
-        _note.ForeColor = Color.DimGray;
-        _note.TextAlign = ContentAlignment.MiddleLeft;
+        var frame = new Panel { Left = 30, Top = 20, Width = 760, Height = 600, BackColor = Color.White };
+        frame.Paint += (_, e) =>
+        {
+            using var pen = new Pen(Gold, 1.2F);
+            e.Graphics.DrawRectangle(pen, 0, 0, frame.Width - 2, frame.Height - 2);
+        };
 
-        AddField("Username", _username, 190);
-        AddField("Display name", _displayName, 253);
-        AddField("Password", _password, 316, password: true);
-        AddField("Confirm password", _confirmPassword, 379, password: true);
+        using var sourceLogo = Image.FromFile(Path.Combine(AppContext.BaseDirectory, "assets", "roose-brand-mark.png"));
+        var logo = new PictureBox { Left = 93, Top = 37, Width = 130, Height = 80, BackColor = Color.White, SizeMode = PictureBoxSizeMode.Zoom, Image = new Bitmap(sourceLogo) };
+        var wordmark = new Label { Text = "ROOSE HOTEL", Left = 236, Top = 47, Width = 420, Height = 40, ForeColor = Coffee, Font = new Font("Georgia", 25F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft };
+        var tagline = new Label { Text = "Luxury. Comfort. Excellence.", Left = 239, Top = 88, Width = 410, Height = 28, ForeColor = Coffee, Font = new Font("Georgia", 11F, FontStyle.Italic) };
+        var divider = new Panel { Left = 55, Top = 132, Width = 650, Height = 2, BackColor = Gold };
 
-        _submit.SetBounds(55, 455, 370, 44);
+        _title.SetBounds(130, 154, 500, 38);
+        _title.Font = new Font("Georgia", 21F, FontStyle.Bold);
+        _title.ForeColor = Coffee;
+        _title.TextAlign = ContentAlignment.MiddleCenter;
+        _note.SetBounds(130, 195, 500, 28);
+        _note.ForeColor = Color.FromArgb(105, 96, 88);
+        _note.TextAlign = ContentAlignment.MiddleCenter;
+
+        AddField(frame, "Username", _username, 240);
+        _displayNameCaption = AddField(frame, "Display name", _displayName, 300);
+        _passwordCaption = AddField(frame, "Password", _password, 360, password: true);
+        _confirmPasswordCaption = AddField(frame, "Confirm password", _confirmPassword, 420, password: true);
+
+        _submit.SetBounds(130, 493, 500, 46);
         _submit.FlatStyle = FlatStyle.Flat;
-        _submit.FlatAppearance.BorderSize = 0;
-        _submit.BackColor = Color.FromArgb(105, 60, 28);
+        _submit.FlatAppearance.BorderColor = Gold;
+        _submit.FlatAppearance.BorderSize = 1;
+        _submit.BackColor = Coffee;
         _submit.ForeColor = Color.White;
+        _submit.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+        _submit.Cursor = Cursors.Hand;
+        _submit.FlatAppearance.MouseOverBackColor = Color.FromArgb(110, 74, 51);
         _submit.Click += async (_, _) => await SubmitAsync();
+
+        _footer.SetBounds(95, 548, 570, 30);
+        _footer.ForeColor = Color.FromArgb(105, 96, 88);
+        _footer.Font = new Font("Segoe UI", 9F);
+        _footer.TextAlign = ContentAlignment.MiddleCenter;
+
+        frame.Controls.AddRange([logo, wordmark, tagline, divider, _title, _note, _submit, _footer]);
+        Controls.Add(frame);
         AcceptButton = _submit;
-        Controls.AddRange([brand, _title, _note, _submit]);
         Load += async (_, _) => await SetModeAsync();
     }
 
-    private void AddField(string label, TextBox input, int top, bool password = false)
+    private Label AddField(Control parent, string caption, TextBox input, int top, bool password = false)
     {
-        var caption = new Label { Text = label, Left = 55, Top = top, Width = 370, Height = 20, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(58, 33, 18) };
-        input.SetBounds(55, top + 22, 370, 32);
+        var label = new Label { Text = caption, Left = 130, Top = top, Width = 500, Height = 19, ForeColor = Coffee, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+        var border = new Panel { Left = 130, Top = top + 22, Width = 500, Height = 32, BackColor = Color.White };
+        border.Paint += (_, e) =>
+        {
+            using var pen = new Pen(input.Focused ? Coffee : Gold, input.Focused ? 1.4F : 1F);
+            e.Graphics.DrawRectangle(pen, 0, 0, border.Width - 2, border.Height - 2);
+        };
+        input.BorderStyle = BorderStyle.None;
+        input.SetBounds(7, 6, 484, 20);
+        input.BackColor = Color.White;
+        input.ForeColor = Coffee;
+        input.Font = new Font("Segoe UI", 10F);
         if (password) input.UseSystemPasswordChar = true;
-        Controls.Add(caption);
-        Controls.Add(input);
+        input.GotFocus += (_, _) => border.Invalidate();
+        input.LostFocus += (_, _) => border.Invalidate();
+        border.Controls.Add(input);
+        parent.Controls.Add(label);
+        parent.Controls.Add(border);
+        return label;
     }
 
     private async Task SetModeAsync()
@@ -66,23 +110,31 @@ public sealed class LoginForm : Form
         try
         {
             _firstRun = await _repository.GetStaffCountAsync() == 0;
-            _title.Text = _firstRun ? "Create the first staff account" : "Staff sign in";
+            _title.Text = _firstRun ? "First-time staff setup" : "Staff Login";
             _note.Text = _firstRun
-                ? "First run: create an account for authorized hotel staff."
-                : "Sign in with your hotel staff account.";
-            _displayName.Visible = _firstRun;
-            _confirmPassword.Visible = _firstRun;
-            Controls.OfType<Label>().FirstOrDefault(x => x.Text == "Display name")!.Visible = _firstRun;
-            Controls.OfType<Label>().FirstOrDefault(x => x.Text == "Confirm password")!.Visible = _firstRun;
-            if (!_firstRun)
+                ? "Create the initial account for authorized ROOSE Hotel staff."
+                : "Sign in to continue to the ROOSE Hotel staff workspace.";
+            _displayName.Visible = _displayNameCaption.Visible = _firstRun;
+            _confirmPassword.Visible = _confirmPasswordCaption.Visible = _firstRun;
+            _displayName.Parent!.Visible = _firstRun;
+            _confirmPassword.Parent!.Visible = _firstRun;
+            _submit.Text = _firstRun ? "CREATE FIRST STAFF ACCOUNT" : "SIGN IN";
+            _footer.Text = _firstRun
+                ? "The first account is for authorized staff. Future account creation is restricted."
+                : "New staff accounts are created by authorized management.";
+            if (_firstRun)
             {
-                _password.Top = 275;
-                _submit.Top = 360;
-                Controls.OfType<Label>().First(x => x.Text == "Password").Top = 253;
+                _submit.Top = 493;
                 _username.Focus();
             }
-            else _username.Focus();
-            _submit.Text = _firstRun ? "Create account and continue" : "Sign in";
+            else
+            {
+                _passwordCaption.Top = 300;
+                _password.Parent!.Top = 322;
+                _submit.Top = 390;
+                _footer.Top = 448;
+                _username.Focus();
+            }
         }
         catch (Exception ex)
         {

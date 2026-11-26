@@ -4,11 +4,12 @@ Group 10's C# Windows Forms project for managing hotel rooms, guests, reservatio
 
 ## Current increment
 
-The initial application foundation includes:
+The foundation and room-management increments include:
 
 - `RooseHotel.Core`: room, guest, and reservation models, plus shared date-overlap and charge rules.
 - `RooseHotel.Data`: SQLite schema setup, sample room seeding, salted staff-password storage, guest search/registration, date-based availability, and guarded reservation creation.
-- `RooseHotel.App`: first-run staff account setup, sign-in, a Windows Forms dashboard, room list, and availability search.
+- `RooseHotel.App`: first-run staff account setup, sign-in, a Windows Forms dashboard, room listing, search/filtering, add/edit/details forms, and availability search.
+- `RooseHotel.Tests`: unit and SQLite integration cases for reservation rules, staff password hashing, seed data, room CRUD, and availability conflicts.
 
 The guest, reservation, billing, and check-in/check-out screens are planned for later increments. The first-run account is the initial local staff account; additional staff-management screens are not part of this increment.
 
@@ -24,6 +25,8 @@ RooseHotel.Data (SQLite repository)
 
 The app stores its local database at `%LOCALAPPDATA%\RooseHotel\roosehotel.db`.
 
+The UI uses white backgrounds, fine gold borders, and coffee-brown active states; see [docs/visual-style.md](docs/visual-style.md).
+
 ## Build and run
 
 Requirements: Windows, .NET 9 SDK, and access to NuGet for the `Microsoft.Data.Sqlite` package.
@@ -31,6 +34,7 @@ Requirements: Windows, .NET 9 SDK, and access to NuGet for the `Microsoft.Data.S
 ```powershell
 dotnet restore RooseHotel.sln
 dotnet run --project RooseHotel.App
+dotnet test RooseHotel.sln
 ```
 
 ## Seed-data assumptions to confirm

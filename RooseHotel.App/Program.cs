@@ -9,7 +9,10 @@ static class Program
     static async Task Main()
     {
         ApplicationConfiguration.Initialize();
-        var databaseDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RooseHotel");
+        var dataDirectoryOverride = Environment.GetEnvironmentVariable("ROOSE_HOTEL_DATA_DIR");
+        var databaseDirectory = string.IsNullOrWhiteSpace(dataDirectoryOverride)
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RooseHotel")
+            : Path.GetFullPath(dataDirectoryOverride);
         IHotelRepository repository = new SqliteHotelRepository(Path.Combine(databaseDirectory, "roosehotel.db"));
         try
         {
