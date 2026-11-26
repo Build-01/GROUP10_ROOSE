@@ -87,6 +87,25 @@ public sealed class HotelTests
     }
 
     [Fact]
+    public async Task Guest_CreateUpdateAndSearch_PersistsContactDetails()
+    {
+        var (repository, folder) = CreateRepository();
+        try
+        {
+            await repository.InitializeAsync();
+            var id = await repository.CreateGuestAsync(new Guest(0, "Ada Guest", "08000000000", "ada@example.test"));
+            await repository.UpdateGuestAsync(new Guest(id, "Ada Updated", "08000000001", "updated@example.test"));
+
+            var byName = await repository.SearchGuestsAsync("Updated");
+            var byPhone = await repository.SearchGuestsAsync("8000000001");
+            Assert.Single(byName);
+            Assert.Equal("updated@example.test", byName[0].Email);
+            Assert.Contains(byPhone, guest => guest.Id == id);
+        }
+        finally { DeleteTestFolder(folder); }
+    }
+
+    [Fact]
     public async Task AvailabilitySearch_RejectsOverlapsAndAllowsAdjacentStay()
     {
         var (repository, folder) = CreateRepository();
@@ -116,6 +135,9 @@ public sealed class HotelTests
 
     private static void DeleteTestFolder(string folder)
     {
+        // Microsoft.Data.Sqlite pools connections by connection string. Clear the
+        // pool before deleting the temporary database on Windows.
+        SqliteConnection.ClearAllPools();
         if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
     }
 }

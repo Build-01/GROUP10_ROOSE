@@ -19,7 +19,7 @@ Room category names, room assignments, nightly rates, staff accounts, and any re
 | FR-01 | The system shall allow authorized staff to enter the staff workspace. On first run, it shall allow creation of the initial staff account. | The first account requires a username, display name, and password; later sign-ins require valid credentials; invalid credentials are rejected with a clear message. Passwords are salted and hashed before storage. |
 | FR-02 | The system shall display a dashboard with room and daily-operation summaries. | Summary values are derived from stored records and refresh after relevant changes. |
 | FR-03 | The system shall store and display room number, category, nightly rate, capacity, and operational status. | Staff can find a room and see all five fields. |
-| FR-04 | The system shall register guests and store searchable guest details. | A guest with required fields can be saved and retrieved by name or contact detail. |
+| FR-04 | The system shall register guests, store searchable guest details, and allow contact details to be updated. | A guest with required fields can be saved and retrieved by name, phone, or email; edits persist. |
 | FR-05 | The system shall search rooms for a check-in and check-out date range. | Results exclude rooms under maintenance and rooms with overlapping active reservations. |
 | FR-06 | The system shall create a reservation for a registered guest and eligible room. | A valid request is saved with a unique reservation ID and confirmed status. |
 | FR-07 | The system shall reject invalid stay dates and overlapping reservations for the same room. | Check-out must be later than check-in; an overlapping active stay is rejected. |

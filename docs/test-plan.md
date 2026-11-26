@@ -30,10 +30,24 @@
 | IT-07 | FR-03 | Edit a room's category, rate, capacity, and status. | Updated values persist and appear in the room list. | Pending execution |
 | IT-08 | FR-03 | Add or rename a room to a duplicate number. | Database rejects the duplicate and UI explains the conflict. | Pending execution |
 | IT-09 | FR-03/05 | Filter the room list by number, category, and operational status. | Only rooms matching all selected filters are shown. | Pending execution |
+| IT-10 | FR-04 | Register a guest with name, phone, and email. | Guest record is saved and searchable by name, phone, and email. | Passed (26 Nov 2026) |
+| IT-11 | FR-04 | Update a guest's contact details. | Updated name, phone, and email persist. | Passed (26 Nov 2026) |
 | ST-01 | FR-01/02 | Sign in and open dashboard. | Authorized staff sees current summary. | Pending execution |
 | ST-02 | FR-04–09 | Register a guest and complete a valid booking. | Reservation and charge summary are correct. | Pending execution |
 | ST-03 | FR-10 | Check in then check out an eligible reservation. | State changes are recorded in order. | Pending execution |
 
 ## Execution log
 
-The core, data, app, and test projects compile. The VSTest process could not connect to its testhost after a 120-second timeout, so no automated assertions ran and all cases remain pending. Rerun `dotnet test RooseHotel.sln` in the target Windows development environment and record the build/runtime version, actual result, pass/fail, defect ID, and retest result. A test is not marked passed until the observed output is recorded.
+### 2026-11-26 — Phase 2 verification
+
+Command: `dotnet test RooseHotel.Tests/RooseHotel.Tests.csproj --no-restore --verbosity minimal --logger "console;verbosity=normal"`.
+
+Environment: .NET SDK 9.0.305, .NET runtime 9.0.9, VSTest 17.14.1, Windows x64. Result: **6 passed, 0 failed**. Covered room seeding (30 rooms, idempotent initialization), room create/update persistence, duplicate room rejection, reservation date/charge rules, availability overlap and adjacent dates, and password hashing. Defect fixed during verification: SQLite connection pooling kept temporary test databases open during teardown; the test helper now clears SQLite pools before deleting test folders.
+
+System walkthroughs and screenshots remain planned acceptance/release evidence.
+
+### 2026-11-26 — Phase 3 verification
+
+Command: `dotnet test RooseHotel.Tests/RooseHotel.Tests.csproj --no-restore --verbosity minimal --logger "console;verbosity=minimal"`.
+
+Result: **7 passed, 0 failed, 0 skipped** (including guest create/update and search by name and phone). Full application build: `dotnet build RooseHotel.App/RooseHotel.App.csproj --no-restore --verbosity minimal -p:BaseOutputPath=bin/phase3/ -p:UseSharedCompilation=false` — **0 warnings, 0 errors**. Separate output was used because the already-running app holds its default build files open. Guest screen manual walkthrough and screenshot remain for release evidence.

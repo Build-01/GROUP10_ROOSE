@@ -81,5 +81,6 @@ public interface IHotelRepository
         CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Guest>> SearchGuestsAsync(string query, CancellationToken cancellationToken = default);
     Task<int> CreateGuestAsync(Guest guest, CancellationToken cancellationToken = default);
+    Task UpdateGuestAsync(Guest guest, CancellationToken cancellationToken = default);
     Task<int> CreateReservationAsync(ReservationRequest request, CancellationToken cancellationToken = default);
 }

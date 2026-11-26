@@ -49,7 +49,7 @@ public sealed class MainForm : Form
         nav.Controls.Add(_dashboardNavigation);
         nav.Controls.Add(NavButton("Rooms", ShowRooms));
         nav.Controls.Add(NavButton("Availability", ShowAvailability));
-        nav.Controls.Add(NavButton("Guests", () => ShowComingSoon("Guest Management")));
+        nav.Controls.Add(NavButton("Guests", ShowGuests));
         nav.Controls.Add(NavButton("Reservations", () => ShowComingSoon("Reservation Management")));
         nav.Controls.Add(NavButton("Check-in / Check-out", () => ShowComingSoon("Check-in / Check-out")));
         sidebar.Controls.Add(nav);
@@ -278,6 +278,50 @@ public sealed class MainForm : Form
     {
         PreparePage(module, "This module is scheduled for a later development increment.");
         _content.Controls.Add(Card("The application foundation and shared reservation rules are in place. This workflow will be connected in a later increment.", 0, 110, 830, 100));
+    }
+
+    private void ShowGuests()
+    {
+        PreparePage("Guest Management", "Register guests and keep their contact details current.");
+        var search = new TextBox { BorderStyle = BorderStyle.None, BackColor = Color.White, ForeColor = Coffee, PlaceholderText = "Search name, phone, or email..." };
+        var searchFrame = GoldInput(search, 0, 112, 390, 36);
+        var grid = new DataGridView { Left = 0, Top = 165, Width = 900, Height = 390, ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, MultiSelect = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, RowHeadersVisible = false, BackgroundColor = Color.White, BorderStyle = BorderStyle.None };
+        grid.Columns.Add("id", "Guest ID"); grid.Columns.Add("name", "Full Name"); grid.Columns.Add("phone", "Phone"); grid.Columns.Add("email", "Email");
+        grid.Columns[0].FillWeight = 55;
+        grid.EnableHeadersVisualStyles = false;
+        grid.ColumnHeadersDefaultCellStyle.BackColor = Color.White; grid.ColumnHeadersDefaultCellStyle.ForeColor = Coffee;
+        grid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
+        grid.DefaultCellStyle.SelectionBackColor = Coffee; grid.DefaultCellStyle.SelectionForeColor = Color.White;
+        var add = new Button { Text = "Register guest", Left = 0, Top = 575, Width = 165, Height = 40 }; StylePrimaryAction(add);
+        var edit = new Button { Text = "Edit selected", Left = 180, Top = 575, Width = 155, Height = 40 }; StyleSecondaryAction(edit);
+        _content.Controls.AddRange([searchFrame, grid, add, edit]);
+        async Task RefreshAsync()
+        {
+            grid.Rows.Clear();
+            foreach (var guest in await _repository.SearchGuestsAsync(search.Text))
+                grid.Rows.Add($"G{guest.Id:000}", guest.FullName, guest.Phone, guest.Email);
+        }
+        search.TextChanged += async (_, _) => await RefreshAsync();
+        add.Click += async (_, _) =>
+        {
+            using var form = new GuestEditorForm();
+            if (form.ShowDialog(this) != DialogResult.OK) return;
+            try { await _repository.CreateGuestAsync(form.GuestToSave); await RefreshAsync(); _status.Text = "Guest registered."; }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "Guest management", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        };
+        edit.Click += async (_, _) =>
+        {
+            if (grid.CurrentRow is null) { MessageBox.Show(this, "Select a guest to edit.", "Guest management", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            var idText = grid.CurrentRow.Cells[0].Value?.ToString()?.TrimStart('G');
+            if (!int.TryParse(idText, out var id)) return;
+            var guest = (await _repository.SearchGuestsAsync("" )).FirstOrDefault(g => g.Id == id);
+            if (guest is null) return;
+            using var form = new GuestEditorForm(guest);
+            if (form.ShowDialog(this) != DialogResult.OK) return;
+            try { await _repository.UpdateGuestAsync(form.GuestToSave); await RefreshAsync(); _status.Text = "Guest details updated."; }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "Guest management", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        };
+        _ = RefreshAsync();
     }
 
     private static Panel Card(string text, int left, int top, int width, int height)

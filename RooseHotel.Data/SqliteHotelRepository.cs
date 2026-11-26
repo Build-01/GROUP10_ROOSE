@@ -211,6 +211,22 @@ public sealed class SqliteHotelRepository(string databasePath) : IHotelRepositor
         return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken));
     }
 
+    public async Task UpdateGuestAsync(Guest guest, CancellationToken cancellationToken = default)
+    {
+        if (guest.Id <= 0 || string.IsNullOrWhiteSpace(guest.FullName) || string.IsNullOrWhiteSpace(guest.Phone))
+            throw new ArgumentException("A saved guest, name, and phone are required.");
+        await using var connection = OpenConnection();
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "UPDATE Guests SET FullName = $name, Phone = $phone, Email = $email WHERE Id = $id;";
+        command.Parameters.AddWithValue("$id", guest.Id);
+        command.Parameters.AddWithValue("$name", guest.FullName.Trim());
+        command.Parameters.AddWithValue("$phone", guest.Phone.Trim());
+        command.Parameters.AddWithValue("$email", guest.Email.Trim());
+        if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
+            throw new InvalidOperationException("The guest record no longer exists.");
+    }
+
     public async Task<int> CreateReservationAsync(ReservationRequest request, CancellationToken cancellationToken = default)
     {
         if (!ReservationRules.HasValidDates(request.CheckIn, request.CheckOut))
