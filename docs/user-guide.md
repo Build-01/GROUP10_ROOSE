@@ -4,7 +4,7 @@
 
 1. Start the app on Windows with .NET 9 installed.
 2. On first launch, create the initial authorized staff account. Choose a private password and keep it with the staff member; no default password is shipped or printed in this guide.
-3. Sign in to open the dashboard. Use **Logout** when leaving the workstation.
+3. Sign in to open the dashboard. Close the app when finished, especially on a shared workstation.
 
 The local SQLite file is `%LOCALAPPDATA%\RooseHotel\roosehotel.db`. Treat this as local project/demo data; it is not a shared multi-computer deployment.
 
@@ -12,7 +12,7 @@ The local SQLite file is `%LOCALAPPDATA%\RooseHotel\roosehotel.db`. Treat this a
 
 | Task | Navigation and steps |
 | --- | --- |
-| Review arrivals | Open **Dashboard** for room counts, arrivals, and departures. |
+| Review operations | Open **Dashboard** for total/in-service/available rooms, occupancy, today's arrivals and departures, in-house stays, the next seven days of arrivals, and rooms needing attention. The saved data reloads whenever Dashboard opens; select **Refresh** to reload it while the page is open. |
 | Manage rooms | Open **Rooms** to search, filter, view details, add, or edit room details and operational status. |
 | Register a guest | Open **Guests**, enter the guest's name, phone, and email, then register. Search to find or edit an existing guest. |
 | Check availability | Open **Availability**, enter check-in and check-out dates and guest count, then search. Check-out is the exclusive end date. |

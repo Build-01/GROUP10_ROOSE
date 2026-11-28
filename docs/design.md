@@ -85,6 +85,27 @@ classDiagram
       +DateTimeOffset ActualCheckIn
       +DateTimeOffset ActualCheckOut
     }
+    class ReservationSummary {
+      +int Id
+      +string GuestName
+      +string RoomNumber
+      +DateOnly CheckIn
+      +DateOnly CheckOut
+      +ReservationStatus Status
+    }
+    class DashboardSummary {
+      +int TotalRooms
+      +int InServiceRooms
+      +int AvailableToday
+      +int OccupiedRooms
+      +decimal OccupancyPercent
+      +int ArrivalsToday
+      +int DeparturesToday
+      +int GuestsInHouse
+      +int UpcomingArrivals
+      +int RoomsNeedingAttention
+      +Build(rooms, reservations, today) DashboardSummary
+    }
     class ReservationRules {
       +HasValidDates(checkIn, checkOut) bool
       +Overlaps(start, end, otherStart, otherEnd) bool
@@ -109,6 +130,9 @@ classDiagram
     }
     Guest "1" --> "0..*" Reservation : books
     Room "1" --> "0..*" Reservation : assigned to
+    Reservation --> ReservationSummary : read as
+    DashboardSummary ..> Room : aggregates
+    DashboardSummary ..> ReservationSummary : aggregates
     Reservation ..> ReservationRules : validated by
     IHotelRepository ..> Room : stores
     IHotelRepository ..> Guest : stores
@@ -171,6 +195,8 @@ flowchart TD
 
 `Rooms` stores room identity, category, nightly rate, capacity, and operational status. The UI derives the `Occupied` display state from a reservation in `CheckedIn`; occupancy remains separate from operational state. `Guests` stores contact records. `Reservations` references one guest and one room, stores ISO `yyyy-MM-dd` booked dates, a status, and nullable actual check-in/check-out timestamps. `Staff` stores a unique username, display name, and password salt/hash; it never stores the entered password. Foreign keys are enabled. The date overlap rule is `existing.CheckIn < requested.CheckOut AND requested.CheckIn < existing.CheckOut`; adjacent stays therefore do not conflict.
 
+`DashboardSummary` is a read-time aggregate of persisted rooms and reservations. It is rebuilt whenever staff open or refresh the dashboard; there is no separate cached dashboard record to become stale.
+
 The first run creates the initial staff account. Passwords are hashed with PBKDF2-SHA256 and a random per-account salt. Room assignments and the fourth category's name/rate remain group-confirmation items.
 
 ## 7. Check-in and check-out activity
@@ -190,4 +216,23 @@ flowchart TD
     K --> L[Set reservation to CheckedOut]
     L --> M[Release room occupancy]
     M --> N([End])
+```
+
+## 8. Dashboard refresh sequence
+
+```mermaid
+sequenceDiagram
+    actor Staff
+    participant UI as Dashboard
+    participant Repo as SQLite repository
+    participant Core as DashboardSummary
+    participant DB as SQLite
+    Staff->>UI: Open dashboard or select Refresh
+    UI->>Repo: Get rooms and reservations
+    Repo->>DB: Read current saved records
+    DB-->>Repo: Current room and reservation rows
+    Repo-->>UI: Room and reservation lists
+    UI->>Core: Build summary for today's date
+    Core-->>UI: Counts and arrival/departure lists
+    UI-->>Staff: Render current operations overview
 ```
