@@ -7,7 +7,8 @@ Group 10's C# Windows Forms project for managing hotel rooms, guests, reservatio
 The application implements the planned front-desk workflow in incremental phases:
 
 - Staff first-run setup and sign-in with salted password hashes.
-- Dashboard and 30 seeded rooms across four development-assumption categories.
+- Dashboard with room availability, occupancy, arrivals/departures, in-house stays, upcoming bookings, and rooms needing attention; values reload from SQLite on entry or refresh.
+- 30 seeded rooms across four development-assumption categories.
 - Room management, guest registration/search/edit, and date-based availability.
 - Reservation create, search, edit, cancellation, and overlap protection.
 - Accommodation charge summaries with print preview.

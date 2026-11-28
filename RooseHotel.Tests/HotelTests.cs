@@ -75,6 +75,47 @@ public sealed class HotelTests
     }
 
     [Fact]
+    public async Task DashboardSummary_RefreshesFromPersistedRecordsAfterRepositoryReopens()
+    {
+        var (repository, folder) = CreateRepository();
+        try
+        {
+            await repository.InitializeAsync();
+            var rooms = await repository.GetRoomsAsync();
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var guestId = await repository.CreateGuestAsync(new Guest(0, "Dashboard Guest", "08000000000", "dashboard@example.test"));
+
+            var inHouseId = await repository.CreateReservationAsync(new ReservationRequest(guestId, rooms[0].Id,
+                today, today.AddDays(2)));
+            await repository.CheckInReservationAsync(inHouseId, DateTimeOffset.Now);
+            await repository.CreateReservationAsync(new ReservationRequest(guestId, rooms[1].Id,
+                today, today.AddDays(1)));
+            await repository.CreateReservationAsync(new ReservationRequest(guestId, rooms[2].Id,
+                today.AddDays(3), today.AddDays(4)));
+            await repository.UpdateRoomAsync(rooms[3] with { OperationalStatus = RoomOperationalStatus.Maintenance });
+            SqliteConnection.ClearAllPools();
+
+            var reopened = new SqliteHotelRepository(Path.Combine(folder, "test.db"));
+            await reopened.InitializeAsync();
+            var summary = DashboardSummary.Build(await reopened.GetRoomsAsync(), await reopened.GetReservationsAsync(), today);
+
+            Assert.Equal(30, summary.TotalRooms);
+            Assert.Equal(29, summary.InServiceRooms);
+            Assert.Equal(27, summary.AvailableToday);
+            Assert.Equal(1, summary.OccupiedRooms);
+            Assert.Equal(3.3m, summary.OccupancyPercent);
+            Assert.Equal(1, summary.ArrivalsToday);
+            Assert.Empty(summary.DepartureReservations);
+            Assert.Equal(1, summary.GuestsInHouse);
+            Assert.Equal(1, summary.UpcomingArrivals);
+            Assert.Equal(1, summary.RoomsNeedingAttention);
+            Assert.Equal("Dashboard Guest", Assert.Single(summary.ArrivalReservations).GuestName);
+            Assert.Equal(today.AddDays(3), Assert.Single(summary.UpcomingReservations).CheckIn);
+        }
+        finally { DeleteTestFolder(folder); }
+    }
+
+    [Fact]
     public async Task InitializeAsync_SeedsThirtyRoomsOnlyOnce()
     {
         var (repository, folder) = CreateRepository();

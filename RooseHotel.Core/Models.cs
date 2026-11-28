@@ -56,6 +56,64 @@ public sealed record ReservationSummary(int Id, int GuestId, string GuestName, s
     public int Nights => CheckOut.DayNumber - CheckIn.DayNumber;
 }
 
+public sealed record DashboardSummary(
+    int TotalRooms,
+    int InServiceRooms,
+    int AvailableToday,
+    int OccupiedRooms,
+    decimal OccupancyPercent,
+    int ArrivalsToday,
+    int DeparturesToday,
+    int GuestsInHouse,
+    int UpcomingArrivals,
+    int RoomsNeedingAttention,
+    IReadOnlyList<ReservationSummary> ArrivalReservations,
+    IReadOnlyList<ReservationSummary> DepartureReservations,
+    IReadOnlyList<ReservationSummary> UpcomingReservations)
+{
+    public static DashboardSummary Build(IReadOnlyList<Room> rooms,
+        IReadOnlyList<ReservationSummary> reservations, DateOnly today)
+    {
+        var tomorrow = today.AddDays(1);
+        var arrivals = reservations
+            .Where(item => item.Status == ReservationStatus.Confirmed && item.CheckIn == today)
+            .OrderBy(item => item.GuestName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var departures = reservations
+            .Where(item => item.Status == ReservationStatus.CheckedIn && item.CheckOut == today)
+            .OrderBy(item => item.GuestName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var upcoming = reservations
+            .Where(item => item.Status == ReservationStatus.Confirmed && item.CheckIn > today && item.CheckIn <= today.AddDays(7))
+            .OrderBy(item => item.CheckIn)
+            .ThenBy(item => item.GuestName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var availableToday = rooms.Count(room =>
+            room.OperationalStatus == RoomOperationalStatus.Available &&
+            !room.IsOccupied &&
+            !reservations.Any(item =>
+                item.RoomNumber == room.Number &&
+                ReservationRules.BlocksAvailability(item.Status) &&
+                ReservationRules.Overlaps(today, tomorrow, item.CheckIn, item.CheckOut)));
+        var occupied = rooms.Count(room => room.IsOccupied);
+
+        return new DashboardSummary(
+            rooms.Count,
+            rooms.Count(room => room.OperationalStatus == RoomOperationalStatus.Available),
+            availableToday,
+            occupied,
+            rooms.Count == 0 ? 0m : Math.Round(occupied * 100m / rooms.Count, 1),
+            arrivals.Count,
+            departures.Count,
+            reservations.Count(item => item.Status == ReservationStatus.CheckedIn),
+            upcoming.Count,
+            rooms.Count(room => room.OperationalStatus != RoomOperationalStatus.Available),
+            arrivals,
+            departures,
+            upcoming);
+    }
+}
+
 public static class ReservationRules
 {
     public static bool HasValidDates(DateOnly checkIn, DateOnly checkOut) => checkOut > checkIn;

@@ -33,6 +33,7 @@ Each completed increment is recorded as a separate, reviewable Git change set wi
 | 5. Accommodation billing | Complete | Added a reservation-based billing summary with guest, room, stay dates, night count, saved nightly rate, total, and print preview. Verification on 26 Nov 2026: app build 0 warnings/errors; 9/9 automated tests passed. Manual billing screenshot remains release evidence. |
 | 6. Check-in and check-out | Complete | Check-in/out records actual timestamps and enforces reservation state/date rules. Room lists show checked-in rooms as Occupied; availability searches block them until checkout. Existing databases are migrated for actual arrival/departure fields. App build has 0 warnings/errors and 10/10 tests pass; manual workflow screenshot remains release evidence. |
 | 7. Release evidence | In progress | On 28 Nov 2026, all 12 automated tests passed and the full solution built with 0 warnings/errors. The report and staff guide are prepared. A live UI/group acceptance walkthrough, screenshots/video, member matriculation numbers, video link, and confirmation of the fourth room category/rate remain outstanding. |
+| 8. Dashboard operations overview | Complete (automated data evidence) | Added live room availability/occupancy, arrivals/departures, in-house stays, 7-day arrivals, room attention counts, and a refresh action. Dashboard reads persisted SQLite data whenever opened; 13/13 tests and the Release app build passed on 28 Nov 2026. Visual walkthrough remains a user review item. |
 
 ## Team responsibilities
 

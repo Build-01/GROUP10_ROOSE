@@ -15,6 +15,7 @@ public sealed class MainForm : Form
     private readonly Label _status = new() { Dock = DockStyle.Bottom, Height = 30, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(16, 0, 0, 0), ForeColor = Coffee, BackColor = Color.White };
     private Button? _activeNavigation;
     private Button? _dashboardNavigation;
+    private int _dashboardRequestVersion;
 
     public MainForm(IHotelRepository repository, string staffName)
     {
@@ -88,6 +89,7 @@ public sealed class MainForm : Form
 
     private void PreparePage(string title, string subtitle)
     {
+        _dashboardRequestVersion++;
         _content.Controls.Clear();
         _content.Controls.Add(new Label { Text = title, Left = 0, Top = 0, Width = 900, Height = 48, ForeColor = Coffee, Font = new Font("Georgia", 23F, FontStyle.Bold) });
         _content.Controls.Add(new Label { Text = subtitle, Left = 0, Top = 54, Width = 900, Height = 30, ForeColor = Color.FromArgb(105, 96, 88) });
@@ -96,29 +98,307 @@ public sealed class MainForm : Form
 
     private void ShowDashboard()
     {
-        PreparePage($"Welcome, {_staffName}", "Hotel room reservation system · Staff workspace");
-        _content.Controls.Add(Card("Plan stays, manage rooms, and keep guest records in one place.", 0, 110, 830, 75));
-        var action = new Button { Text = "Check room availability", Left = 0, Top = 205, Width = 235, Height = 46 };
-        StylePrimaryAction(action);
-        action.Click += (_, _) => ShowAvailability();
-        _content.Controls.Add(action);
-        _ = LoadDashboardStatsAsync();
+        var greeting = DateTime.Now.Hour switch
+        {
+            < 12 => "Good morning",
+            < 17 => "Good afternoon",
+            _ => "Good evening"
+        };
+        PreparePage($"{greeting}, {_staffName}", $"Hotel operations · {DateTime.Today:dddd, d MMMM yyyy}");
+
+        var width = Math.Max(700, _content.ClientSize.Width - 60);
+        var root = new Panel
+        {
+            Left = 0,
+            Top = 108,
+            Width = width,
+            Height = 785,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+            BackColor = Color.White
+        };
+        _content.Controls.Add(root);
+
+        var actions = new Panel { Left = 0, Top = 0, Width = width, Height = 42, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+        var reservations = new Button { Text = "Reservations", Left = 0, Top = 0, Width = 145, Height = 38 };
+        StylePrimaryAction(reservations);
+        reservations.Click += (_, _) => ShowReservations();
+        var guests = new Button { Text = "Register guest", Left = 156, Top = 0, Width = 145, Height = 38 };
+        StyleSecondaryAction(guests);
+        guests.Click += (_, _) => ShowGuests();
+        var availability = new Button { Text = "Check availability", Left = 312, Top = 0, Width = 170, Height = 38 };
+        StyleSecondaryAction(availability);
+        availability.Click += (_, _) => ShowAvailability();
+        var refreshed = new Label
+        {
+            Text = "Loading saved data…",
+            Left = Math.Max(490, width - 264),
+            Top = 0,
+            Width = 150,
+            Height = 38,
+            TextAlign = ContentAlignment.MiddleRight,
+            ForeColor = Color.FromArgb(105, 96, 88),
+            Font = new Font("Segoe UI", 8.5F)
+        };
+        refreshed.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        var refresh = new Button { Text = "Refresh", Left = width - 104, Top = 0, Width = 104, Height = 38, Anchor = AnchorStyles.Top | AnchorStyles.Right };
+        StyleSecondaryAction(refresh);
+        actions.Controls.AddRange([reservations, guests, availability, refreshed, refresh]);
+        root.Controls.Add(actions);
+
+        var metrics = new TableLayoutPanel
+        {
+            Left = 0,
+            Top = 52,
+            Width = width,
+            Height = 112,
+            ColumnCount = 5,
+            RowCount = 1,
+            BackColor = Color.White,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+            Margin = Padding.Empty
+        };
+        metrics.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        for (var i = 0; i < 5; i++) metrics.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
+        var metricCards = new[]
+        {
+            DashboardMetricCard("Total rooms", "—", "hotel inventory"),
+            DashboardMetricCard("Available today", "—", "free for a stay"),
+            DashboardMetricCard("Occupied now", "—", "of total rooms"),
+            DashboardMetricCard("Arrivals today", "—", "confirmed stays"),
+            DashboardMetricCard("Departures today", "—", "checked-in stays")
+        };
+        for (var i = 0; i < metricCards.Length; i++) metrics.Controls.Add(metricCards[i].Panel, i, 0);
+        root.Controls.Add(metrics);
+
+        var operations = new TableLayoutPanel
+        {
+            Left = 0,
+            Top = 174,
+            Width = width,
+            Height = 78,
+            ColumnCount = 3,
+            RowCount = 1,
+            BackColor = Color.White,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+            Margin = Padding.Empty
+        };
+        operations.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        for (var i = 0; i < 3; i++) operations.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / 3));
+        var operationCards = new[]
+        {
+            DashboardMetricCard("In-house stays", "—", "currently checked in", compact: true),
+            DashboardMetricCard("Next 7 days", "—", "confirmed arrivals", compact: true),
+            DashboardMetricCard("Rooms needing attention", "—", "maintenance or out of service", compact: true)
+        };
+        for (var i = 0; i < operationCards.Length; i++) operations.Controls.Add(operationCards[i].Panel, i, 0);
+        root.Controls.Add(operations);
+
+        var arrivalsTable = CreateDashboardTable("Today's arrivals", "Expected guest arrivals", "No arrivals scheduled today.", ["Reservation", "Guest", "Room"]);
+        var departuresTable = CreateDashboardTable("Today's departures", "Guests currently due to leave", "No departures scheduled today.", ["Reservation", "Guest", "Room"]);
+        var dailyTables = new TableLayoutPanel
+        {
+            Left = 0,
+            Top = 262,
+            Width = width,
+            Height = 244,
+            ColumnCount = 2,
+            RowCount = 1,
+            BackColor = Color.White,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+            Margin = Padding.Empty
+        };
+        dailyTables.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        dailyTables.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        dailyTables.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        arrivalsTable.Panel.Margin = new Padding(0, 0, 8, 0);
+        departuresTable.Panel.Margin = new Padding(8, 0, 0, 0);
+        dailyTables.Controls.Add(arrivalsTable.Panel, 0, 0);
+        dailyTables.Controls.Add(departuresTable.Panel, 1, 0);
+        root.Controls.Add(dailyTables);
+
+        var upcomingTable = CreateDashboardTable("Upcoming reservations", "Confirmed arrivals over the next 7 days", "No confirmed arrivals in the next 7 days.",
+            ["Reservation", "Guest", "Room", "Check-in", "Check-out"]);
+        upcomingTable.Panel.SetBounds(0, 516, width, 245);
+        upcomingTable.Panel.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        root.Controls.Add(upcomingTable.Panel);
+
+        var view = new DashboardView(root, metricCards, operationCards, refreshed,
+            arrivalsTable, departuresTable, upcomingTable);
+        refresh.Click += async (_, _) => await RefreshDashboardAsync(view);
+        _ = RefreshDashboardAsync(view);
     }
 
-    private async Task LoadDashboardStatsAsync()
+    private async Task RefreshDashboardAsync(DashboardView view)
     {
+        var requestVersion = ++_dashboardRequestVersion;
+        view.LastUpdated.Text = "Refreshing…";
         try
         {
-            var rooms = await _repository.GetRoomsAsync();
-            if (IsDisposed || _content.Controls.Count < 3) return;
-            var stats = new FlowLayoutPanel { Left = 0, Top = 290, Width = 850, Height = 125, WrapContents = false, BackColor = Color.White };
-            stats.Controls.Add(StatCard("Total Rooms", rooms.Count.ToString(CultureInfo.InvariantCulture)));
-            stats.Controls.Add(StatCard("Operational", rooms.Count(r => r.OperationalStatus == RoomOperationalStatus.Available && !r.IsOccupied).ToString(CultureInfo.InvariantCulture)));
-            stats.Controls.Add(StatCard("Categories", Enum.GetValues<RoomCategory>().Length.ToString(CultureInfo.InvariantCulture)));
-            _content.Controls.Add(stats);
+            var roomsTask = _repository.GetRoomsAsync();
+            var reservationsTask = _repository.GetReservationsAsync();
+            await Task.WhenAll(roomsTask, reservationsTask);
+            if (IsDisposed || view.Root.IsDisposed || view.Root.Parent != _content || requestVersion != _dashboardRequestVersion) return;
+
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var summary = DashboardSummary.Build(await roomsTask, await reservationsTask, today);
+            SetDashboardMetric(view.Metrics[0], summary.TotalRooms.ToString(CultureInfo.InvariantCulture), $"{summary.InServiceRooms} in service");
+            SetDashboardMetric(view.Metrics[1], summary.AvailableToday.ToString(CultureInfo.InvariantCulture), "available for a stay today");
+            SetDashboardMetric(view.Metrics[2], summary.OccupiedRooms.ToString(CultureInfo.InvariantCulture), $"{summary.OccupancyPercent:N1}% of total inventory");
+            SetDashboardMetric(view.Metrics[3], summary.ArrivalsToday.ToString(CultureInfo.InvariantCulture), "confirmed arrivals today");
+            SetDashboardMetric(view.Metrics[4], summary.DeparturesToday.ToString(CultureInfo.InvariantCulture), "checked-in departures today");
+            SetDashboardMetric(view.Operations[0], summary.GuestsInHouse.ToString(CultureInfo.InvariantCulture), "currently checked in");
+            SetDashboardMetric(view.Operations[1], summary.UpcomingArrivals.ToString(CultureInfo.InvariantCulture), "confirmed arrivals in 7 days");
+            SetDashboardMetric(view.Operations[2], summary.RoomsNeedingAttention.ToString(CultureInfo.InvariantCulture), "maintenance or out of service");
+            PopulateDashboardTable(view.Arrivals, summary.ArrivalReservations, includeDates: false);
+            PopulateDashboardTable(view.Departures, summary.DepartureReservations, includeDates: false);
+            PopulateDashboardTable(view.Upcoming, summary.UpcomingReservations, includeDates: true);
+            view.LastUpdated.Text = $"Updated {DateTime.Now:h:mm tt}";
+            _status.Text = "Dashboard refreshed from saved hotel records.";
         }
-        catch (Exception ex) { _status.Text = $"Could not load dashboard information: {ex.Message}"; }
+        catch (Exception ex)
+        {
+            if (!IsDisposed && !view.Root.IsDisposed && view.Root.Parent == _content && requestVersion == _dashboardRequestVersion)
+            {
+                view.LastUpdated.Text = "Refresh failed";
+                _status.Text = $"Could not refresh the dashboard: {ex.Message}";
+            }
+        }
     }
+
+    private static DashboardMetric DashboardMetricCard(string title, string value, string detail, bool compact = false)
+    {
+        var panel = new Panel
+        {
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 0, 10, 0),
+            BackColor = Color.White,
+            Padding = compact ? new Padding(12, 7, 12, 6) : new Padding(12, 9, 12, 8)
+        };
+        panel.Paint += (_, e) => { using var pen = new Pen(Gold, 1F); e.Graphics.DrawRectangle(pen, 0, 0, panel.Width - 2, panel.Height - 2); };
+        var titleLabel = new Label
+        {
+            Text = title,
+            Dock = DockStyle.Top,
+            Height = compact ? 19 : 21,
+            ForeColor = Color.FromArgb(105, 96, 88),
+            Font = new Font("Segoe UI", compact ? 8F : 8.5F, FontStyle.Bold),
+            AutoEllipsis = true
+        };
+        var valueLabel = new Label
+        {
+            Text = value,
+            Dock = DockStyle.Fill,
+            ForeColor = Coffee,
+            Font = new Font("Georgia", compact ? 17F : 22F, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft,
+            AutoEllipsis = true
+        };
+        var detailLabel = new Label
+        {
+            Text = detail,
+            Dock = DockStyle.Bottom,
+            Height = compact ? 18 : 20,
+            ForeColor = Color.FromArgb(105, 96, 88),
+            Font = new Font("Segoe UI", compact ? 7F : 7.5F),
+            AutoEllipsis = true
+        };
+        panel.Controls.Add(valueLabel);
+        panel.Controls.Add(detailLabel);
+        panel.Controls.Add(titleLabel);
+        return new DashboardMetric(panel, valueLabel, detailLabel);
+    }
+
+    private static void SetDashboardMetric(DashboardMetric metric, string value, string detail)
+    {
+        metric.Value.Text = value;
+        metric.Detail.Text = detail;
+    }
+
+    private static DashboardTable CreateDashboardTable(string title, string subtitle, string emptyText, string[] columns)
+    {
+        var panel = new Panel { BackColor = Color.White, Padding = new Padding(12) };
+        panel.Paint += (_, e) => { using var pen = new Pen(Gold, 1F); e.Graphics.DrawRectangle(pen, 0, 0, panel.Width - 2, panel.Height - 2); };
+        var heading = new Panel { Dock = DockStyle.Top, Height = 44, BackColor = Color.White };
+        heading.Controls.Add(new Label
+        {
+            Text = title,
+            Dock = DockStyle.Top,
+            Height = 23,
+            ForeColor = Coffee,
+            Font = new Font("Georgia", 11F, FontStyle.Bold),
+            AutoEllipsis = true
+        });
+        heading.Controls.Add(new Label
+        {
+            Text = subtitle,
+            Dock = DockStyle.Fill,
+            ForeColor = Color.FromArgb(105, 96, 88),
+            Font = new Font("Segoe UI", 7.5F),
+            AutoEllipsis = true
+        });
+        var grid = new DataGridView
+        {
+            Dock = DockStyle.Fill,
+            ReadOnly = true,
+            AllowUserToAddRows = false,
+            AllowUserToDeleteRows = false,
+            MultiSelect = false,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            RowHeadersVisible = false,
+            BackgroundColor = Color.White,
+            BorderStyle = BorderStyle.None,
+            CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+            GridColor = Gold,
+            Font = new Font("Segoe UI", 8.5F),
+            ColumnHeadersHeight = 32,
+            RowTemplate = { Height = 30 }
+        };
+        foreach (var column in columns) grid.Columns.Add(column.Replace(" ", ""), column);
+        grid.EnableHeadersVisualStyles = false;
+        grid.ColumnHeadersDefaultCellStyle.BackColor = Color.White;
+        grid.ColumnHeadersDefaultCellStyle.ForeColor = Coffee;
+        grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.White;
+        grid.ColumnHeadersDefaultCellStyle.SelectionForeColor = Coffee;
+        grid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
+        grid.DefaultCellStyle.SelectionBackColor = Coffee;
+        grid.DefaultCellStyle.SelectionForeColor = Color.White;
+        grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(250, 247, 242);
+        var empty = new Label
+        {
+            Text = emptyText,
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleCenter,
+            ForeColor = Color.FromArgb(105, 96, 88),
+            Font = new Font("Segoe UI", 9F)
+        };
+        var body = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(0, 5, 0, 0) };
+        body.Controls.Add(grid);
+        body.Controls.Add(empty);
+        panel.Controls.Add(body);
+        panel.Controls.Add(heading);
+        return new DashboardTable(panel, grid, empty);
+    }
+
+    private static void PopulateDashboardTable(DashboardTable table, IReadOnlyList<ReservationSummary> items, bool includeDates)
+    {
+        table.Grid.Rows.Clear();
+        foreach (var item in items)
+        {
+            object[] values = includeDates
+                ? [$"R{item.Id:000}", item.GuestName, item.RoomNumber, item.CheckIn.ToString("dd MMM"), item.CheckOut.ToString("dd MMM")]
+                : [$"R{item.Id:000}", item.GuestName, item.RoomNumber];
+            var row = table.Grid.Rows.Add(values);
+            table.Grid.Rows[row].Tag = item;
+        }
+        table.Grid.Visible = items.Count > 0;
+        table.EmptyState.Visible = items.Count == 0;
+    }
+
+    private sealed record DashboardMetric(Panel Panel, Label Value, Label Detail);
+    private sealed record DashboardTable(Panel Panel, DataGridView Grid, Label EmptyState);
+    private sealed record DashboardView(Panel Root, DashboardMetric[] Metrics, DashboardMetric[] Operations,
+        Label LastUpdated, DashboardTable Arrivals, DashboardTable Departures, DashboardTable Upcoming);
 
     private void ShowRooms()
     {
