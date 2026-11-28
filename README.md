@@ -38,6 +38,10 @@ dotnet run --project RooseHotel.App
 dotnet test RooseHotel.sln
 ```
 
+## Download for Windows
+
+[Download the Windows x64 app ZIP](output/download/ROOSE_Hotel_Reservation_System_Windows_x64.zip). Extract the ZIP and run `RooseHotel.App.exe`. The package requires the **.NET 9 Desktop Runtime for Windows x64**. On first launch, create the initial staff account; no default credentials are provided. Local data is stored at `%LOCALAPPDATA%\RooseHotel\roosehotel.db`.
+
 ## Seed-data assumptions to confirm
 
 The overview says there are 30 rooms in four categories. The image shows Standard at ₦80,000, Deluxe at ₦120,000, and Executive Suite at ₦180,000, but does not identify the fourth category or its rate. The initial seed data uses Family Suite at ₦220,000 for development; confirm these room assignments and rates with the group before treating them as final hotel data.
