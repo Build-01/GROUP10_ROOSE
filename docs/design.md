@@ -58,6 +58,8 @@ classDiagram
       +decimal NightlyRate
       +int Capacity
       +RoomOperationalStatus OperationalStatus
+      +bool IsOccupied
+      +string DisplayStatus
     }
     class Guest {
       +int Id
@@ -80,6 +82,8 @@ classDiagram
       +DateOnly CheckOut
       +ReservationStatus Status
       +int Nights
+      +DateTimeOffset ActualCheckIn
+      +DateTimeOffset ActualCheckOut
     }
     class ReservationRules {
       +HasValidDates(checkIn, checkOut) bool
@@ -97,6 +101,11 @@ classDiagram
       +SearchGuestsAsync(query)
       +CreateGuestAsync(guest)
       +CreateReservationAsync(request)
+      +GetReservationsAsync(query)
+      +UpdateReservationAsync(request)
+      +CancelReservationAsync(id)
+      +CheckInReservationAsync(id, time)
+      +CheckOutReservationAsync(id, time)
     }
     Guest "1" --> "0..*" Reservation : books
     Room "1" --> "0..*" Reservation : assigned to
@@ -160,6 +169,25 @@ flowchart TD
 
 ## 6. Data design notes
 
-`Rooms` stores room identity, category, nightly rate, capacity, and operational status. `Guests` stores the guest contact record. `Reservations` references one guest and one room, stores ISO `yyyy-MM-dd` dates, and has a reservation status. `Staff` stores a unique username, display name, and password salt/hash; it never stores the entered password. Foreign keys are enabled. The date overlap rule is `existing.CheckIn < requested.CheckOut AND requested.CheckIn < existing.CheckOut`; adjacent stays therefore do not conflict.
+`Rooms` stores room identity, category, nightly rate, capacity, and operational status. The UI derives the `Occupied` display state from a reservation in `CheckedIn`; occupancy remains separate from operational state. `Guests` stores contact records. `Reservations` references one guest and one room, stores ISO `yyyy-MM-dd` booked dates, a status, and nullable actual check-in/check-out timestamps. `Staff` stores a unique username, display name, and password salt/hash; it never stores the entered password. Foreign keys are enabled. The date overlap rule is `existing.CheckIn < requested.CheckOut AND requested.CheckIn < existing.CheckOut`; adjacent stays therefore do not conflict.
 
 The first run creates the initial staff account. Passwords are hashed with PBKDF2-SHA256 and a random per-account salt. Room assignments and the fourth category's name/rate remain group-confirmation items.
+
+## 7. Check-in and check-out activity
+
+```mermaid
+flowchart TD
+    A([Start]) --> B[Find a confirmed reservation]
+    B --> C{Is today within the booked stay?}
+    C -- No --> D[Reject check-in and explain eligibility]
+    C -- Yes --> E[Record actual arrival timestamp]
+    E --> F[Set reservation to CheckedIn]
+    F --> G[Show room as Occupied and exclude it from availability]
+    G --> H[Staff checks out the guest]
+    H --> I{Is reservation CheckedIn?}
+    I -- No --> J[Reject invalid state]
+    I -- Yes --> K[Record departure timestamp]
+    K --> L[Set reservation to CheckedOut]
+    L --> M[Release room occupancy]
+    M --> N([End])
+```

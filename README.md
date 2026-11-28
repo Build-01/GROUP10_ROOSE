@@ -2,25 +2,26 @@
 
 Group 10's C# Windows Forms project for managing hotel rooms, guests, reservations, accommodation charges, and arrivals/departures.
 
-## Current increment
+## Current release
 
-The foundation and room-management increments include:
+The application implements the planned front-desk workflow in incremental phases:
 
-- `RooseHotel.Core`: room, guest, and reservation models, plus shared date-overlap and charge rules.
-- `RooseHotel.Data`: SQLite schema setup, sample room seeding, salted staff-password storage, guest search/registration, date-based availability, and guarded reservation creation.
-- `RooseHotel.App`: first-run staff account setup, sign-in, a Windows Forms dashboard, room listing, search/filtering, add/edit/details forms, and availability search.
-- `RooseHotel.Tests`: unit and SQLite integration cases for reservation rules, staff password hashing, seed data, room CRUD, and availability conflicts.
+- Staff first-run setup and sign-in with salted password hashes.
+- Dashboard and 30 seeded rooms across four development-assumption categories.
+- Room management, guest registration/search/edit, and date-based availability.
+- Reservation create, search, edit, cancellation, and overlap protection.
+- Accommodation charge summaries with print preview.
+- Check-in/check-out timestamps and room occupancy derived from checked-in reservations.
 
-The guest, reservation, billing, and check-in/check-out screens are planned for later increments. The first-run account is the initial local staff account; additional staff-management screens are not part of this increment.
+The initial release excludes public booking, card payments, POS, housekeeping, payroll, and multi-branch management. The Family Suite category and its ₦220,000 rate are development assumptions because the source overview did not define the fourth category; confirm them before operational use.
 
 ## Architecture
 
 ```text
 RooseHotel.App (Windows Forms)
-        ↓
-RooseHotel.Core (models and business rules)
-        ↑
-RooseHotel.Data (SQLite repository)
+       ├── RooseHotel.Core (models and business rules)
+       └── RooseHotel.Data (SQLite repository)
+                  └── RooseHotel.Core
 ```
 
 The app stores its local database at `%LOCALAPPDATA%\RooseHotel\roosehotel.db`.
@@ -41,6 +42,6 @@ dotnet test RooseHotel.sln
 
 The overview says there are 30 rooms in four categories. The image shows Standard at ₦80,000, Deluxe at ₦120,000, and Executive Suite at ₦180,000, but does not identify the fourth category or its rate. The initial seed data uses Family Suite at ₦220,000 for development; confirm these room assignments and rates with the group before treating them as final hotel data.
 
-## Assignment deliverables still to prepare
+## Verification and hand-in
 
-Requirements specification, UML and architecture diagrams, complete module workflows, test plan and results, screenshots, demo video, and final PDF report.
+The incremental development log and test execution evidence are in `docs/development-plan.md` and `docs/test-plan.md`. The final report PDF is in `output/pdf/`. Before submission, the group must add matriculation numbers and a shareable demonstration video link, and complete a live staff login and front-desk walkthrough. See `docs/user-guide.md` for the demo flow.

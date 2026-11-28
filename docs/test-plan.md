@@ -2,67 +2,59 @@
 
 ## Test levels
 
-| Level | Purpose | Planned evidence |
+| Level | Purpose | Evidence / limitation |
 | --- | --- | --- |
-| Unit | Verify individual date, overlap, status, and charge rules. | Test ID, input, expected, actual, result. |
-| Integration | Verify UI-to-service-to-SQLite behavior, constraints, and persistence. | Database-backed test results and captured defects. |
-| System | Verify full front-desk workflows against FR-01 through FR-11. | End-to-end execution log and screenshots. |
-| Acceptance | Confirm the delivered application meets the group's agreed scenarios and submission needs. | Group walkthrough/sign-off before release. |
+| Unit | Verify date, overlap, status, password, and charge rules. | Automated xUnit tests. |
+| Integration | Verify repository behavior against SQLite, including constraints and persistence. | Automated database-backed xUnit tests. |
+| System | Verify the complete front-desk workflow in the Windows Forms application. | Requires a live staff setup/login and UI walkthrough; not represented by repository tests. |
+| Acceptance | Confirm the delivered behavior against group scenarios. | Group walkthrough and sign-off remain to be recorded. |
 
-## Planned test cases
+## Current test coverage
 
-| ID | Requirement | Scenario / input | Expected result | Status |
-| --- | --- | --- | --- | --- |
-| IT-00 | FR-01 | First application run with no staff account. | Setup form creates initial account; password is stored as a salted hash. | Pending execution |
-| IT-00b | FR-01 | Sign in with correct then incorrect password. | Correct credentials open staff workspace; incorrect credentials are rejected. | Pending execution |
-| UT-01 | FR-07 | Check-out is one day after check-in. | Date range is valid; one night. | Pending execution |
-| UT-02 | FR-07 | Check-out equals check-in. | Date range is rejected. | Pending execution |
-| UT-03 | FR-07 | Check-out is before check-in. | Date range is rejected. | Pending execution |
-| UT-04 | FR-07 | Existing 10–12 Nov; requested 12–14 Nov. | No overlap. | Pending execution |
-| UT-05 | FR-07 | Existing 10–12 Nov; requested 11–13 Nov. | Overlap detected. | Pending execution |
-| UT-06 | FR-09 | Rate ₦120,000; three nights. | Charge is ₦360,000. | Passed (26 Nov 2026) |
-| IT-01 | FR-11 | Initialize an empty database. | Schema and expected 30 seed rooms are created once. | Pending execution |
-| IT-02 | FR-05 | Search dates conflicting with a confirmed reservation. | The reserved room is omitted. | Passed (26 Nov 2026) |
-| IT-03 | FR-06/07 | Insert overlapping reservation for the same room. | Operation is rejected and no duplicate row is saved. | Passed (26 Nov 2026) |
-| IT-04 | FR-08 | Cancel a reservation and search its dates. | The cancelled reservation no longer blocks the room. | Passed (26 Nov 2026) |
-| IT-05 | FR-11 | Save records, close connection, reopen database. | Saved data is still present. | Pending execution |
-| IT-06 | FR-03 | Add a room with valid details. | Room is stored and appears in the room list. | Pending execution |
-| IT-07 | FR-03 | Edit a room's category, rate, capacity, and status. | Updated values persist and appear in the room list. | Pending execution |
-| IT-08 | FR-03 | Add or rename a room to a duplicate number. | Database rejects the duplicate and UI explains the conflict. | Pending execution |
-| IT-09 | FR-03/05 | Filter the room list by number, category, and operational status. | Only rooms matching all selected filters are shown. | Pending execution |
-| IT-10 | FR-04 | Register a guest with name, phone, and email. | Guest record is saved and searchable by name, phone, and email. | Passed (26 Nov 2026) |
-| IT-11 | FR-04 | Update a guest's contact details. | Updated name, phone, and email persist. | Passed (26 Nov 2026) |
-| IT-12 | FR-06/07/08 | Create overlapping and adjacent stays, update a confirmed reservation, cancel it, then search the released dates. | Overlap is rejected, adjacent stay is allowed, update persists, and cancellation frees availability. | Passed (26 Nov 2026) |
-| IT-13 | FR-09 | Load a reservation summary for a ₦120,000 room and three nights. | Summary reports the saved rate, three nights, and ₦360,000 charge. | Passed (26 Nov 2026) |
-| IT-14 | FR-10/11 | Open a database created by the previous schema, check in an active reservation, then check out. | Schema gains arrival/departure fields; room shows occupied and is unavailable after arrival, then is available after checkout. | Passed (26 Nov 2026) |
-| ST-01 | FR-01/02 | Sign in and open dashboard. | Authorized staff sees current summary. | Pending execution |
-| ST-02 | FR-04–09 | Register a guest and complete a valid booking. | Reservation and charge summary are correct. | Pending execution |
-| ST-03 | FR-10 | Check in then check out an eligible reservation. | State changes are recorded in order. | Passed (26 Nov 2026) |
+| ID | Requirement | Input / action | Expected result | Latest evidence | Status |
+| --- | --- | --- | --- | --- | --- |
+| UT-01–05 | FR-07 | Valid, zero-length, reversed, adjacent, and overlapping date ranges. | Valid dates accepted; invalid dates rejected; adjacent stays do not overlap. | Automated reservation rule tests; phase runs on 26 Nov 2026. | Pass |
+| UT-06 | FR-09 | ₦120,000 nightly rate for three nights. | ₦360,000 accommodation charge. | Automated billing test; phase run on 26 Nov 2026. | Pass |
+| IT-00 | FR-01 | Empty database; create first staff account. | First account is stored with salted password verifier; duplicate username is rejected. | `StaffSetup_CreatesFirstAccountAndValidatesCredentials` passed 28 Nov 2026. | Pass |
+| IT-00b | FR-01 | Verify correct and incorrect password against stored hash. | Correct succeeds; incorrect fails. | Password and staff setup tests passed 28 Nov 2026. | Pass |
+| IT-01 | FR-11 | Initialize empty database twice. | Schema and 30 rooms created once; four categories present. | Automated seed/idempotency test; phase runs on 26 Nov 2026. | Pass |
+| IT-02–04 | FR-05–08 | Search overlapping and adjacent stays; cancel a reservation. | Conflicting room omitted, adjacent stay allowed, cancelled stay released. | Automated availability and reservation lifecycle tests; phase runs on 26 Nov 2026. | Pass |
+| IT-05 | FR-11 | Save guest and reservation, close/reopen repository. | Data remains after reopen. | `Repository_PreservesRecordsAfterReopen` passed 28 Nov 2026. | Pass |
+| IT-06–07 | FR-03 | Add room; change category, rate, capacity, and operational status. | Values persist and are returned by repository. | Automated room persistence test; phase runs on 26 Nov 2026. | Pass |
+| IT-08 | FR-03 | Add duplicate room number. | SQLite rejects duplicate number. | Automated duplicate constraint test. UI message not exercised. | Pass (data layer); UI pending |
+| IT-09 | FR-03/05 | Filter visible room list by number, category, and status. | Only matching rows shown. | No UI automation or manual evidence recorded. | Pending manual check |
+| IT-10–11 | FR-04 | Create, update, and search guest contact details. | Saved values returned by name and phone search. | Automated guest repository test; phase runs on 26 Nov 2026. | Pass |
+| IT-12 | FR-06–08 | Create, update, and cancel reservations, including conflict. | Conflict rejected; update persists; cancellation releases dates. | Automated reservation lifecycle test; phase run on 26 Nov 2026. | Pass |
+| IT-13 | FR-09 | Summarize a three-night reservation at ₦120,000/night. | Saved rate, night count, and ₦360,000 total returned. | Automated billing summary test; phase run on 26 Nov 2026. | Pass |
+| IT-14 | FR-10/11 | Migrate prior schema, check in active booking, then check out. | Timestamps saved; room becomes occupied/unavailable, then released. | Automated lifecycle/migration test; phase run on 26 Nov 2026. | Pass |
+| ST-01 | FR-01/02 | Create staff account, sign in, open dashboard. | Authorized staff reaches dashboard. | No credentialed UI walkthrough recorded. | Pending manual check |
+| ST-02 | FR-04–09 | Register a guest and complete a booking. | Reservation and accommodation summary match booking. | Repository modules tested separately; full UI flow not recorded. | Pending manual check |
+| ST-03 | FR-10 | Check in and check out an eligible booking. | State and room availability change in order. | Repository lifecycle integration test passed 26 Nov 2026; UI walkthrough not recorded. | Pass (integration); UI pending |
 
 ## Execution log
 
-### 2026-11-26 — Phase 2 verification
+### Phase 2 — 26 Nov 2026
 
-Command: `dotnet test RooseHotel.Tests/RooseHotel.Tests.csproj --no-restore --verbosity minimal --logger "console;verbosity=normal"`.
+`dotnet test RooseHotel.Tests/RooseHotel.Tests.csproj --no-restore --verbosity minimal --logger "console;verbosity=normal"` — **6 passed, 0 failed**. Covered 30-room idempotent seed, room create/update, duplicate room rejection, reservation date/charge rules, availability overlap and adjacent dates, and password hashing. Fixed SQLite connection-pool cleanup for temporary test databases.
 
-Environment: .NET SDK 9.0.305, .NET runtime 9.0.9, VSTest 17.14.1, Windows x64. Result: **6 passed, 0 failed**. Covered room seeding (30 rooms, idempotent initialization), room create/update persistence, duplicate room rejection, reservation date/charge rules, availability overlap and adjacent dates, and password hashing. Defect fixed during verification: SQLite connection pooling kept temporary test databases open during teardown; the test helper now clears SQLite pools before deleting test folders.
+### Phase 3 — 26 Nov 2026
 
-System walkthroughs and screenshots remain planned acceptance/release evidence.
+Automated suite — **7 passed, 0 failed, 0 skipped**; guest create/update and search included. Application build — **0 warnings, 0 errors**. Guest UI walkthrough not recorded.
 
-### 2026-11-26 — Phase 4 verification
+### Phase 4 — 26 Nov 2026
 
-Command: `dotnet test RooseHotel.Tests/RooseHotel.Tests.csproj --no-restore --verbosity minimal --logger "console;verbosity=minimal"` — **8 passed, 0 failed, 0 skipped**. The reservation lifecycle check verifies overlap rejection, adjacent dates, update persistence, cancellation status, and released-room availability. App build: `dotnet build RooseHotel.App/RooseHotel.App.csproj --no-restore --verbosity minimal -p:BaseOutputPath=bin/phase4/ -p:UseSharedCompilation=false` — **0 warnings, 0 errors**. Manual reservation UI walkthrough/screenshot remains for release evidence.
+Automated suite — **8 passed, 0 failed, 0 skipped**; overlap rejection, adjacent dates, update, cancellation, and released-room availability included. Application build — **0 warnings, 0 errors**. Reservation UI walkthrough not recorded.
 
-### 2026-11-26 — Phase 5 verification
+### Phase 5 — 26 Nov 2026
 
-Command: `dotnet test RooseHotel.Tests/RooseHotel.Tests.csproj --no-restore --verbosity minimal --logger "console;verbosity=minimal"` — **9 passed, 0 failed, 0 skipped**. Billing check: a three-night reservation in a ₦120,000 room returned a ₦360,000 accommodation total; test cases UT-06 and IT-13 passed. App build: `dotnet build RooseHotel.App/RooseHotel.App.csproj --no-restore --verbosity minimal -p:BaseOutputPath=bin/phase5/ -p:UseSharedCompilation=false` — **0 warnings, 0 errors**. Manual billing screen walkthrough/screenshot remains for release evidence.
+Automated suite — **9 passed, 0 failed, 0 skipped**; three nights at ₦120,000/night returned ₦360,000. Application build — **0 warnings, 0 errors**. Billing UI walkthrough not recorded.
 
-### 2026-11-26 — Phase 6 verification
+### Phase 6 — 26 Nov 2026
 
-Command: `dotnet test RooseHotel.Tests/RooseHotel.Tests.csproj --no-restore --verbosity minimal --logger "console;verbosity=minimal"` — **10 passed, 0 failed, 0 skipped**. The check-in/out integration test verifies legacy schema migration, early check-in rejection, actual arrival/departure timestamps, Occupied display, unavailable search results during occupancy, and room release after checkout. App build: `dotnet build RooseHotel.App/RooseHotel.App.csproj --no-restore --verbosity minimal -p:BaseOutputPath=bin/phase6/ -p:UseSharedCompilation=false` — **0 warnings, 0 errors**. Manual front-desk walkthrough/screenshot remains for release evidence.
+Automated suite — **10 passed, 0 failed, 0 skipped**; migration, early check-in rejection, timestamps, occupancy, availability block, and release after checkout included. Application build — **0 warnings, 0 errors**. UI walkthrough not recorded.
 
-### 2026-11-26 — Phase 3 verification
+### Release test rerun — 28 Nov 2026
 
-Command: `dotnet test RooseHotel.Tests/RooseHotel.Tests.csproj --no-restore --verbosity minimal --logger "console;verbosity=minimal"`.
+Two additional tests were added for first-staff setup/credential verification and data persistence after reopening SQLite. The complete test assembly was run with `dotnet test RooseHotel.Tests/RooseHotel.Tests.csproj --no-restore --no-build --verbosity normal --logger "console;verbosity=normal"` — **12 passed, 0 failed** (.NET 9.0.9, VSTest 17.14.1). Both added cases passed. The full solution was then built with `dotnet build RooseHotel.sln --no-restore --verbosity minimal -p:BaseOutputPath=bin/release/ -p:UseSharedCompilation=false` — **0 warnings, 0 errors**.
 
-Result: **7 passed, 0 failed, 0 skipped** (including guest create/update and search by name and phone). Full application build: `dotnet build RooseHotel.App/RooseHotel.App.csproj --no-restore --verbosity minimal -p:BaseOutputPath=bin/phase3/ -p:UseSharedCompilation=false` — **0 warnings, 0 errors**. Separate output was used because the already-running app holds its default build files open. Guest screen manual walkthrough and screenshot remain for release evidence.
+System and acceptance checks still need an actual group walkthrough and sign-off. UI room filtering, live login, printing, and full visual workflow have not been manually recorded.

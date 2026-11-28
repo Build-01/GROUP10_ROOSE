@@ -30,6 +30,51 @@ public sealed class HotelTests
     }
 
     [Fact]
+    public async Task StaffSetup_CreatesFirstAccountAndValidatesCredentials()
+    {
+        var (repository, folder) = CreateRepository();
+        try
+        {
+            await repository.InitializeAsync();
+            Assert.Equal(0, await repository.GetStaffCountAsync());
+            const string testOnlyPassword = "RooseTestPass2026";
+            var (salt, hash) = PasswordSecurity.CreateHash(testOnlyPassword);
+            await repository.CreateStaffAsync("frontdesk", "Demo Staff", salt, hash);
+
+            var staff = await repository.FindStaffAsync("FRONTDESK");
+            Assert.Equal(1, await repository.GetStaffCountAsync());
+            Assert.NotNull(staff);
+            Assert.True(PasswordSecurity.Verify(testOnlyPassword, staff!.PasswordSalt, staff.PasswordHash));
+            Assert.False(PasswordSecurity.Verify("wrong-password", staff.PasswordSalt, staff.PasswordHash));
+            var duplicate = await Assert.ThrowsAsync<SqliteException>(() => repository.CreateStaffAsync("frontdesk", "Other Staff", salt, hash));
+            Assert.Equal(19, duplicate.SqliteErrorCode);
+        }
+        finally { DeleteTestFolder(folder); }
+    }
+
+    [Fact]
+    public async Task Repository_PreservesRecordsAfterReopen()
+    {
+        var (repository, folder) = CreateRepository();
+        try
+        {
+            await repository.InitializeAsync();
+            var guestId = await repository.CreateGuestAsync(new Guest(0, "Persistent Guest", "08000000000", "persist@example.test"));
+            var room = (await repository.GetRoomsAsync()).First();
+            await repository.CreateReservationAsync(new ReservationRequest(guestId, room.Id,
+                new DateOnly(2026, 12, 10), new DateOnly(2026, 12, 11)));
+            SqliteConnection.ClearAllPools();
+
+            var reopened = new SqliteHotelRepository(Path.Combine(folder, "test.db"));
+            await reopened.InitializeAsync();
+            Assert.Equal(30, (await reopened.GetRoomsAsync()).Count);
+            Assert.Single(await reopened.SearchGuestsAsync("Persistent Guest"));
+            Assert.Single(await reopened.GetReservationsAsync("Persistent Guest"));
+        }
+        finally { DeleteTestFolder(folder); }
+    }
+
+    [Fact]
     public async Task InitializeAsync_SeedsThirtyRoomsOnlyOnce()
     {
         var (repository, folder) = CreateRepository();

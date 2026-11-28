@@ -25,14 +25,14 @@ Each completed increment is recorded as a separate, reviewable Git change set wi
 
 | Increment | Status | Notes |
 | --- | --- | --- |
-| 0. Planning and design baseline | In progress | Project overview and feasibility study exist; SRS and diagram set are being assembled from the assignment and agreed scope. |
-| 1. Project foundation | In progress | Application builds and opens. First-run account setup and login walkthrough evidence remain pending. |
+| 0. Planning and design baseline | Complete (document baseline) | Supplied overview and feasibility study reviewed; requirements, architecture, use cases, class model, sequence, booking activity, and check-in/out activity are documented. The fourth room category/rate remains a disclosed assumption for group confirmation. |
+| 1. Project foundation | Complete (automated evidence) | Windows Forms solution, SQLite setup, first staff setup/sign-in, and dashboard are implemented. A live credentialed UI walkthrough is still a release evidence item. |
 | 2. Room management | Complete | Room add, edit, details, search, and filters are implemented. Automated verification: 6/6 xUnit tests passed on 26 Nov 2026 (.NET 9.0.9 runtime, VSTest 17.14.1). Room screen walkthrough/screenshot is retained as a manual evidence item for the final release package. |
 | 3. Guest management | Complete | Guest registration, search by name/phone/email, and contact editing are implemented. Full solution build succeeded with 0 warnings/errors; all 7 automated tests passed on 26 Nov 2026. Guest screen walkthrough/screenshot remains a manual release evidence item. |
 | 4. Reservations | Complete | Availability search, reservation list/search, create, edit, cancel, and detail views are implemented. Build and automated test evidence is logged below; manual reservation walkthrough remains release evidence. |
 | 5. Accommodation billing | Complete | Added a reservation-based billing summary with guest, room, stay dates, night count, saved nightly rate, total, and print preview. Verification on 26 Nov 2026: app build 0 warnings/errors; 9/9 automated tests passed. Manual billing screenshot remains release evidence. |
 | 6. Check-in and check-out | Complete | Check-in/out records actual timestamps and enforces reservation state/date rules. Room lists show checked-in rooms as Occupied; availability searches block them until checkout. Existing databases are migrated for actual arrival/departure fields. App build has 0 warnings/errors and 10/10 tests pass; manual workflow screenshot remains release evidence. |
-| 7. Release evidence | In progress | Prepare acceptance walkthroughs, screenshots, demo, and final hand-in package after the remaining manual checks. |
+| 7. Release evidence | In progress | On 28 Nov 2026, all 12 automated tests passed and the full solution built with 0 warnings/errors. The report and staff guide are prepared. A live UI/group acceptance walkthrough, screenshots/video, member matriculation numbers, video link, and confirmation of the fourth room category/rate remain outstanding. |
 
 ## Team responsibilities
 
