@@ -49,4 +49,4 @@ The overview says there are 30 rooms in four categories. The image shows Standar
 
 ## Verification and hand-in
 
-The incremental development log and test execution evidence are in `docs/development-plan.md` and `docs/test-plan.md`. The final report PDF is in `output/pdf/`. Before submission, the group must add matriculation numbers and a shareable demonstration video link, and complete a live staff login and front-desk walkthrough. See `docs/user-guide.md` for the demo flow.
+The incremental development log and test execution evidence are in `docs/development-plan.md` and `docs/test-plan.md`. The final report PDF is in `output/pdf/`. Before submission, add the group matriculation numbers and the required shareable video link, then complete the live front-desk walkthrough. See `docs/user-guide.md` for staff workflows.
